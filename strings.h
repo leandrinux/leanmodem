@@ -2,8 +2,6 @@
 #define STR_OK "Ok"
 #define STR_YES "Yes"
 #define STR_NO "No"
-#define STR_ON "On"
-#define STR_OFF "Off"
 #define STR_WAIT "Wait"
 #define STR_USER_INPUT_YES "y"
 #define STR_USER_INPUT_NO "y"
@@ -37,6 +35,9 @@
 #define STR_FILES_NOT_FOUND "File not found"
 #define STR_FILES_ERASE_SUCCESS "File erased"
 #define STR_FILES_COPY_COMPLETED "Copy complete"
+
+#define STR_COPY_STANDARD_INPUT "stdin"
+#define STR_COPY_STANDARD_OUTPUT "stdout"
 
 #define STR_ERROR_COMMAND_UNRECOGNIZED "'%s' unrecognized"
 #define STR_ERROR_NOT_IMPLEMENTED "Not implemented"
