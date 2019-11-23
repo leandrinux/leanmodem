@@ -19,6 +19,7 @@
 #define STR_NETWORK_SSID_UNREACHABLE "Unreachable SSID"
 #define STR_NETWORK_SCANNING "Scanning networks..."
 #define STR_NETWORK_FOUND "%d networks found"
+#define STR_NETWORK_UNAVAILABLE "Network unavailable"
 #define STR_NETWORK_HOST_UNAVAILABLE "Host unavailable"
 #define STR_NETWORK_CONNECTED_TO "Connected to '%s1' with IP %s2"
 #define STR_NETWORK_DISCONNECTED "Disconnected"
@@ -38,11 +39,13 @@
 
 #define STR_COPY_STANDARD_INPUT "stdin"
 #define STR_COPY_STANDARD_OUTPUT "stdout"
+#define STR_COPY_PORT_MISSING "Port missing"
+#define STR_COPY_TCP_PREFIX "tcp://"
+#define STR_COPY_HTTP_PREFIX "http://"
 
 #define STR_ERROR_COMMAND_UNRECOGNIZED "'%s' unrecognized"
 #define STR_ERROR_NOT_IMPLEMENTED "Not implemented"
 #define STR_ERROR_INVALID_ARGUMENTS "Invalid arguments"
-#define STR_ERROR_NOT_CONNECTED "Not connected"
 #define STR_ERROR_UNKNOWN "Unknown error"
 
 #define STR_FORMAT_PROMPT "THIS WILL ERASE ALL FILES! Continue? (y/n): "
