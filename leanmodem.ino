@@ -265,6 +265,7 @@ void cmd_config(String args) {
     writeln("  Device ID  : " + CFG_STRING(config.id));
     writeln("  Timezone   : " + String(config.timezone));
     writeln("  Uptime     : " + String(uptime));
+    writeln("  Build Date : " + String(__TIMESTAMP__));
     writeln();
     writeln("NETWORK INFO");
     writeln("  SSID     : " + CFG_STRING(config.ssid));
@@ -284,7 +285,7 @@ void cmd_config(String args) {
 }
 
 void cmd_telnet(String args) {
-  guard(isConnected, STR_ERROR_NOT_CONNECTED);
+  guard(isConnected, STR_NETWORK_UNAVAILABLE);
   guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   String host = "";
   int port = 23;
@@ -370,7 +371,7 @@ void cmd_format(String args) {
   cmd_restart("");
 }
 
-void cmd_copy(String args) {  
+void cmd_copy(String args) {
   guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   int i = args.indexOf(' ');
   guard(i != -1, STR_ERROR_INVALID_ARGUMENTS);
@@ -380,13 +381,62 @@ void cmd_copy(String args) {
   Stream *output = NULL;
   File inputFile;
   File outputFile;
+  WiFiClient inputClient;
   guard(inputArg != STR_COPY_STANDARD_OUTPUT, STR_ERROR_INVALID_ARGUMENTS);
   guard(outputArg != STR_COPY_STANDARD_INPUT, STR_ERROR_INVALID_ARGUMENTS);
   
   if (inputArg == STR_COPY_STANDARD_INPUT) {
     input = &Serial;
+  } else if (inputArg.startsWith(STR_COPY_TCP_PREFIX)) {
+    guard(isConnected, STR_NETWORK_UNAVAILABLE);
+    String uri = inputArg.substring(String(STR_COPY_TCP_PREFIX).length());
+    int i = uri.indexOf(':');
+    guard(i >= 0, STR_COPY_PORT_MISSING);
+    String host = uri.substring(0, i);
+    int port = uri.substring(i+1).toInt();
+    guard(inputClient.connect(host, port), STR_NETWORK_HOST_UNAVAILABLE);
+    input = &inputClient;
+  } else if (inputArg.startsWith(STR_COPY_HTTP_PREFIX)) {
+    guard(isConnected, STR_NETWORK_UNAVAILABLE);
+    String uri = inputArg.substring(String(STR_COPY_HTTP_PREFIX).length());
+    String host;
+    String path;
+    int port;
+    int a = uri.indexOf(':');
+    if (a < 0) {
+      port = 80;
+      int b = uri.indexOf('/');
+      if (b < 0) {
+        b = uri.length();
+        path = "/";
+      } else {
+        path = uri.substring(b);
+      }
+      host = uri.substring(0, b);
+    } else {
+      int b = uri.indexOf('/', a + 1);
+      if (b < 0) {
+        b = uri.length();
+        path = "/";
+      } else {
+        path = uri.substring(b);
+      }
+      port = uri.substring(a + 1, b).toInt();
+      host = uri.substring(0, a);
+    }
+    guard(inputClient.connect(host, port), STR_NETWORK_HOST_UNAVAILABLE);
+    inputClient.println("GET " + path + " HTTP/1.1");
+    inputClient.println("Host: " + host);
+    inputClient.println();
+    String header = inputClient.readStringUntil('\n');
+    guard(header == "HTTP/1.1 200 OK\r", header);
+    while (header != "\r") {
+      header = inputClient.readStringUntil('\n');      
+    }
+    input = &inputClient;
   } else {
     String filename = String(CFG_USER_DIRECTORY) + inputArg;
+    guard(SPIFFS.exists(filename), STR_FILES_NOT_FOUND);
     inputFile = SPIFFS.open(filename, "r");
     if (inputFile) input = &inputFile;
   }
@@ -451,7 +501,7 @@ void cmd_xmodem_send(String args) {
 }
 
 void cmd_time(String args) {
-  guard(isConnected, STR_ERROR_NOT_CONNECTED);
+  guard(isConnected, STR_NETWORK_UNAVAILABLE);
   WiFiUDP ntpUDP;
   NTPClient timeClient(ntpUDP, CFG_NTP_SERVER, config.timezone * 3600);
   timeClient.begin();
