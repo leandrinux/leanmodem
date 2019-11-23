@@ -6,7 +6,6 @@
 
 // DEPENDENCIES ----------------------------------------------------------------
 #include <ESP8266WiFi.h>
-#include <Regexp.h>
 #include <FS.h>
 #include <WiFiUdp.h>
 #include <NTPClient.h>
@@ -52,9 +51,6 @@
 #define STR_NOT_SET "[NOT SET]"
 #define STR_YES "YES"
 #define STR_NO "NO"
-#define STR_NO_CONFIG_FOUND "Configuration not found."
-#define STR_CONFIG_SAVED "Configuration saved."
-#define STR_CONFIG_LOADED "Configuration loaded."
 #define STR_DIRECTORY_USER_TITLE "Listing user files:"
 #define STR_DIRECTORY_SYSTEM_TITLE "Listing system files:"
 #define STR_DIRECTORY_EMPTY "  [Empty]"
@@ -85,15 +81,6 @@
 #define STR_FILE_ERASE_SUCCESS "File erased."
 #define STR_FILE_ERASE_FAILED "File could not be erased"
 
-#define KEY_SEPARATOR ": "
-#define KEY_SSID "SSID"
-#define KEY_PASSWORD "PASSWORD"
-#define KEY_IS_UNIX_EOL "UNIX_EOL"
-#define KEY_IS_SOUND_ENABLED "SOUND_ENABLED"
-#define KEY_IS_ANSI_ENABLED "ANSI_ENABLED"
-#define KEY_IS_ECHO_ENABLED "ECHO_ENABLED"
-#define KEY_IS_AUTOCONNECT "AUTOCONNECT"
-
 #define SND_BEEP 1
 #define SND_GOOD 2
 #define SND_ERROR 3
@@ -111,6 +98,16 @@ typedef struct {
   CommandHandler handler;
 }  CommandEntry;
 
+typedef struct {
+  char ssid[31];
+  char pass[31];
+  bool unix_eol;
+  bool sound;
+  bool ansi;
+  bool echo;
+  bool autoconnect;
+} Config;
+
 // xmodem-crc packet
 typedef struct {
   byte start_of_header;
@@ -121,19 +118,11 @@ typedef struct {
 }  __attribute__((packed)) XmodemPacket;
 
 // FUNCTION DECLARATIONS -------------------------------------------------------
-void cmd_hello(String args);
 void cmd_help(String args);
-void cmd_ssid(String args);
-void cmd_password(String args);
 void cmd_connect(String args);
-void cmd_sound(String args);
-void cmd_ansi(String args);
-void cmd_echo(String args);
-void cmd_beep(String args);
 void cmd_scan(String args);
 void cmd_telnet(String args);
 void cmd_config(String args);
-void cmd_eol(String args);
 void cmd_restart(String args);
 void cmd_files(String args);
 void cmd_format(String args);
@@ -142,25 +131,15 @@ void cmd_xmodem_send(String args);
 void cmd_copy(String args);
 void cmd_time(String args);
 void cmd_erase(String args);
-void cmd_autoconnect(String args);
 
 // CONSTANTS -------------------------------------------------------------------
-const int COMMAND_COUNT = 22;
+const int COMMAND_COUNT = 13;
 const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
   { "help", cmd_help },
-  { "hello", cmd_hello },
-  { "ssid", cmd_ssid },
-  { "password", cmd_password },
   { "connect", cmd_connect },
-  { "sound", cmd_sound },
-  { "ansi", cmd_ansi },
-  { "autoconnect", cmd_autoconnect },
-  { "echo", cmd_echo },
-  { "beep", cmd_beep },
   { "scan", cmd_scan },
   { "telnet", cmd_telnet },
   { "config", cmd_config },
-  { "eol", cmd_eol },
   { "restart", cmd_restart },
   { "files", cmd_files },
   { "format", cmd_format },
@@ -172,14 +151,17 @@ const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
 };
 
 // GLOBAL VARIABLES ------------------------------------------------------------
-String ssid = "";
-String password = "";
-bool isUnixEOL = false;
-bool isSoundEnabled = true;
-bool isAnsiEnabled = true;
+Config config = {
+  "leandro",
+  "lala",
+  false,
+  true,
+  true,
+  true,
+  true
+};
+
 bool isConnected = false;
-bool isEchoEnabled = true;
-bool isAutoconnect = true;
 
 // FUNCTION IMPLEMENTATIONS ----------------------------------------------------
 
@@ -209,13 +191,13 @@ String readln() {
       Serial.readBytes(&ch, 1);
       if ((ch != '\n') && (ch != '\r')) {
         buffer[i] = ch;
-        if (isEchoEnabled) Serial.print(ch);
+        if (config.echo) Serial.print(ch);
         i++;        
       }
     }
   }
   buffer[i] = '\0';
-  if (isEchoEnabled) Serial.print(isUnixEOL ? "\n" : "\r\n");
+  if (config.echo) Serial.print(config.unix_eol ? "\n" : "\r\n");
   return String(buffer);
 }
 
@@ -229,11 +211,11 @@ void write(byte *buffer, unsigned int size) {
 
 void writeln(String s) {
   Serial.print(s);
-  Serial.print(isUnixEOL ? "\n" : "\r\n");
+  Serial.print(config.unix_eol ? "\n" : "\r\n");
 }
 
 void sound(byte type) {
-  if (!isSoundEnabled) return;
+  if (!config.sound) return;
   switch (type) {
     case SND_BEEP:
       tone(CFG_BUZZER_PIN, 1000, 100);
@@ -259,124 +241,23 @@ void sound(byte type) {
 }
 
 String sanitize(String input) {
-  if (isAnsiEnabled) {
+  if (config.ansi) {
     return input;
   } else {
-    char buffer[255];
-    input.toCharArray(buffer, 255);
-    MatchState ms(buffer);
-    
-    //ms.GlobalReplace("(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]", "");
-    ms.GlobalReplace("(\\x9B|\\x1B\\[)[0-?]*[ -\\/]*[@-~]", "");
-    return String(buffer);    
+    return input;   
   }
-}
-
-void saveStr(File file, String key, String value) {
-  file.println(key + KEY_SEPARATOR + value);
-}
-
-void saveBool(File file, String key, bool value) {
-  file.println(key + KEY_SEPARATOR + (value ? STR_YES : STR_NO));
-}
-
-void saveconfig() {
-  File file = SPIFFS.open(CFG_CONFIG_FILENAME, "w");
-  saveStr(file, KEY_SSID, ssid);
-  saveStr(file, KEY_PASSWORD, password);
-  saveBool(file, KEY_IS_UNIX_EOL, isUnixEOL);
-  saveBool(file, KEY_IS_SOUND_ENABLED, isSoundEnabled);
-  saveBool(file, KEY_IS_ANSI_ENABLED, isAnsiEnabled);
-  saveBool(file, KEY_IS_AUTOCONNECT, isAutoconnect); 
-  file.close();
-  writeln(STR_CONFIG_SAVED);
-}
-
-void loadconfig() {
-  File file = SPIFFS.open(CFG_CONFIG_FILENAME, "r");
-  if (!file) {
-    writeln(STR_NO_CONFIG_FOUND);
-    return;
-  }
-  int separatorLength = String(KEY_SEPARATOR).length();
-  while (file.available()) {
-    String line = file.readStringUntil('\n');
-    line[line.length()-1] = '\0';
-    int i = line.indexOf(KEY_SEPARATOR);
-    String key = line.substring(0, i);
-    String value = line.substring(i + separatorLength);
-    if (key == String(KEY_SSID)) {
-      ssid = value;
-      continue;
-    }
-    if (key == String(KEY_PASSWORD)) {
-      password = value;
-      continue;
-    }
-    if (key == String(KEY_IS_UNIX_EOL)) {
-      isUnixEOL = value == STR_YES;
-      continue;
-    }
-    if (key == String(KEY_IS_SOUND_ENABLED)) {
-      isSoundEnabled = value == STR_YES;
-      continue;
-    }
-    if (key == String(KEY_IS_ANSI_ENABLED)) {
-      isAnsiEnabled = value == STR_YES;
-      continue;
-    }
-    if (key == String(KEY_IS_ECHO_ENABLED)) {
-      isEchoEnabled = value == STR_YES;
-      continue;
-    }
-    if (key == String(KEY_IS_AUTOCONNECT)) {
-      isAutoconnect = value == STR_YES;
-      continue;
-    }
-  }
-  file.close();
-  writeln(STR_CONFIG_LOADED);
 }
 
 // COMMAND HANDLERS ------------------------------------------------------------
-
-void cmd_hello(String args) {
-  writeln(STR_GREETING);
-}
 
 void cmd_help(String args) {
   writeln(STR_NOT_IMPLEMENTED);
 }
 
-void cmd_ssid(String args) {
-  if (args == "") {
-    writeln(STR_NULL_SSID_UNSUPPORTED);
-    return;
-  }
-  ssid = args;
-  String msg = String(STR_SSID_SET);
-  msg.replace("%s", ssid);
-  writeln(msg);
-}
-
-void cmd_password(String args) {
-  password = args;
-  if (args == "") {
-    writeln(STR_PASSWORD_SET_BLANK);
-  } else {
-    String msg = String(STR_PASSWORD_SET);
-    msg.replace("%s", password);
-    writeln(msg);
-  }
-}
-
 void cmd_connect(String args) {
-  if (ssid=="") {
-    writeln(STR_SSID_MISSING);
-    return;
-  }
+  guard(*config.ssid, STR_SSID_MISSING);
   writeln(STR_CONNECTING);
-  WiFi.begin(ssid, password);
+  WiFi.begin(config.ssid, config.pass);
   while (1)  {
     byte status = WiFi.status();
     if (status == WL_NO_SSID_AVAIL) {
@@ -387,7 +268,7 @@ void cmd_connect(String args) {
     if (status == WL_CONNECTED) {
       sound(SND_CONNECTED);
       String msg = String(STR_CONNECTED_WITH_IP);
-      msg.replace("%s1", ssid);
+      msg.replace("%s1", config.ssid);
       msg.replace("%s2", WiFi.localIP().toString());
       writeln(msg);
       isConnected = true;
@@ -403,83 +284,6 @@ void cmd_connect(String args) {
 
 }
 
-void cmd_sound(String args) {
-  if (args == "on") { 
-    isSoundEnabled = true;
-    writeln(STR_OK);
-    return;
-  }
-  if (args == "off") {
-    isSoundEnabled = false;
-    writeln(STR_OK);
-    return;
-  }
-  writeln(STR_INVALID_ARGUMENTS);
-}
-
-void cmd_ansi(String args) {
-  writeln(STR_NOT_IMPLEMENTED);
-  return;
-  if (args == "on") { 
-    isAnsiEnabled = true;
-    writeln(STR_OK);
-    return;
-  }
-  if (args == "off") {
-    isAnsiEnabled = false;
-    writeln(STR_OK);
-    return;
-  }
-  writeln(STR_INVALID_ARGUMENTS);
-}
-
-void cmd_echo(String args) {
-  if (args == "on") { 
-    isEchoEnabled = true;
-    writeln(STR_OK);
-    return;
-  }
-  if (args == "off") {
-    isEchoEnabled = false;
-    writeln(STR_OK);
-    return;
-  }
-  writeln(STR_INVALID_ARGUMENTS);
-}
-
-void cmd_autoconnect(String args) {
-  if (args == "on") { 
-    isAutoconnect = true;
-    writeln(STR_OK);
-    return;
-  }
-  if (args == "off") {
-    isAutoconnect = false;
-    writeln(STR_OK);
-    return;
-  }
-  writeln(STR_INVALID_ARGUMENTS);  
-}
-
-void cmd_eol(String args) {
-  if (args == "unix") { 
-    isUnixEOL = true;
-    writeln(STR_OK);
-    return;
-  }
-  if (args == "windows") {
-    isUnixEOL = false;
-    writeln(STR_OK);
-    return;
-  }
-  writeln(STR_INVALID_ARGUMENTS);
-}
-
-void cmd_beep(String args) {
-  writeln(STR_OK);
-  sound(SND_BEEP);
-}
-
 void cmd_scan(String args) {
   writeln(STR_SCANNING);
   int count = WiFi.scanNetworks();
@@ -491,29 +295,77 @@ void cmd_scan(String args) {
 }
 
 void cmd_config(String args) {
+  
   if (args == STR_ARGUMENT_CONFIG_SAVE) {
-    saveconfig();
+    File file = SPIFFS.open(CFG_CONFIG_FILENAME, "w");
+    file.write((byte *)&config, sizeof(config));
+    file.close();
     return;
   }
+  
   if (args == STR_ARGUMENT_CONFIG_LOAD) {
-    loadconfig();
+    if (!SPIFFS.exists(CFG_CONFIG_FILENAME)) return;
+    File file = SPIFFS.open(CFG_CONFIG_FILENAME, "r");
+    file.read((byte *)&config, sizeof(config));
+    file.close();
     return;
   }
+
+  int i = args.indexOf(' ');
+  if (i != -1) {
+    String command = args.substring(0, i);
+    if (command == "set") {
+      String temp = args.substring(i+1);
+      i = temp.indexOf(' ');
+      String propertyName = (i<0) ? temp : temp.substring(0, i);
+      String propertyValue = (i<0) ? "" : temp.substring(i+1);       
+      const int q = 7;
+      const struct {
+        char name[12];
+        void *pointer;
+        bool isBool;
+      } SETTINGS[q] = {
+        { "ssid", &config.ssid, false },
+        { "pass", &config.pass, false },
+        { "sound", &config.sound, true },
+        { "ansi", &config.ansi, true },
+        { "echo", &config.echo, true },
+        { "autoconnect", &config.autoconnect, true },
+        { "unix", &config.unix_eol, true }
+      };
+      int j = 0;
+      while ((j < q) && (String(SETTINGS[j].name) != propertyName)) { j++; };
+      if (j < q) {
+        if (SETTINGS[j].isBool) {
+          if (propertyValue == "on") {
+            *(char *)SETTINGS[j].pointer = true;
+            return;
+          }
+          if (propertyValue == "off") {
+            *(char *)SETTINGS[j].pointer = false;
+            return;
+          }
+        } else {
+          propertyValue.toCharArray((char *)SETTINGS[j].pointer, 30);
+          return;
+        }
+      }
+    }
+  }
+  
   if (args == "") {
     writeln("Network Info:");
-    writeln("  SSID       : " + ((ssid == "") ? String(STR_NOT_SET) : "'" + ssid + "'"));
-    writeln("  Password   : " + ((password == "") ? String(STR_NOT_SET) : "'" + password + "'"));
-    writeln("  Connected to WiFi : " + String(isConnected ? "YES" : "NO") );
+    writeln("  SSID       : " + ((*config.ssid) ? "'" + String(config.ssid) + "'" : String(STR_NOT_SET) ));
+    writeln("  Password   : " + ((*config.pass) ? "'" + String(config.pass) + "'" : String(STR_NOT_SET) ));
+    writeln("  Connected  : " + String(isConnected ? "YES" : "NO") );
     writeln("");
     writeln("System flags:");
-    writeln("  Sound      : " + String(isSoundEnabled ? "ON" : "OFF") );
-    writeln("  ANSI Codes : " + String(isAnsiEnabled ? "ON" : "OFF") );  
-    writeln("  User Echo  : " + String(isEchoEnabled ? "ON" : "OFF") );
-    writeln("  Autoconnect  : " + String(isAutoconnect ? "ON" : "OFF") );    
+    writeln("  Sound       : " + String(config.sound ? "ON" : "OFF") );
+    writeln("  ANSI Codes  : " + String(config.ansi ? "ON" : "OFF") );  
+    writeln("  User Echo   : " + String(config.echo ? "ON" : "OFF") );
+    writeln("  Autoconnect : " + String(config.autoconnect ? "ON" : "OFF") );    
+    writeln("  Unix EOL    : " + String (config.unix_eol ? "ON" : "OFF"));
     writeln("");
-    writeln("Other info:");
-    writeln("  Line Endings: " + String (isUnixEOL ? "UNIX" : "WINDOWS"));
-    writeln("");    
     return;
   }
   writeln(STR_INVALID_ARGUMENTS);
@@ -617,7 +469,7 @@ void cmd_format(String args) {
     delay(1000);
     cmd_restart("");
   } else {
-    if (!isEchoEnabled) writeln("");
+    if (!config.echo) writeln("");
     writeln(STR_FORMAT_CANCELED);
   }
 }
@@ -771,15 +623,13 @@ void setup() {
   writeln(STR_BOOT_PRE_MESSAGE);
   SPIFFS.begin();
   SPIFFS.gc();
-  if (SPIFFS.exists(CFG_CONFIG_FILENAME)) {
-    loadconfig();
-    if (isAutoconnect && (ssid != "")) cmd_connect("");
-  }
+  cmd_config(STR_ARGUMENT_CONFIG_LOAD);
+  if (config.autoconnect && *config.ssid) cmd_connect("");
   writeln(STR_BOOT_POST_MESSAGE);
 }
 
 void loop() {
-  if (isEchoEnabled) Serial.print(STR_COMMAND_PROMPT);
+  if (config.echo) Serial.print(STR_COMMAND_PROMPT);
   String userInput = readln();
   if (userInput != "") parseCommand(userInput);
 }
