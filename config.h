@@ -1,0 +1,11 @@
+// CONFIGURATION ---------------------------------------------------------------
+#define CFG_CONSOLE_BAUD_RATE 19200
+#define CFG_STARTUP_DELAY 10
+#define CFG_BUZZER_PIN 15
+#define CFG_CONFIG_FILENAME "/s/config.ini"
+#define CFG_USER_DIRECTORY "/u/"
+#define CFG_SYSTEM_DIRECTORY "/s/"
+#define CFG_TELNET_BREAK_KEYCODE 27
+#define CFG_TELNET_BUFFER_SIZE 2048
+#define CFG_XMODEM_TIMEOUT 2000
+#define CFG_NTP_SERVER "pool.ntp.org"

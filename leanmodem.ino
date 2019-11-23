@@ -10,83 +10,9 @@
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 
-// CONFIGURATION ---------------------------------------------------------------
-#define CFG_CONSOLE_BAUD_RATE 19200
-#define CFG_STARTUP_DELAY 10
-#define CFG_BUZZER_PIN 15
-#define CFG_CONFIG_FILENAME "/s/config.ini"
-#define CFG_USER_DIRECTORY "/u/"
-#define CFG_SYSTEM_DIRECTORY "/s/"
-#define CFG_TELNET_BREAK_KEYCODE 27
-#define CFG_TELNET_BUFFER_SIZE 2048
-#define CFG_XMODEM_TIMEOUT 2000
-#define CFG_NTP_SERVER "pool.ntp.org"
-
-// STRINGS ---------------------------------------------------------------------
-#define STR_COMMAND_PROMPT "> "
-#define STR_BOOT_PRE_MESSAGE "\r\nleanmodem is starting up"
-#define STR_BOOT_POST_MESSAGE "Ready. Enter 'help' for assistance"
-#define STR_COMMAND_UNRECOGNIZED "Command '%s' unknown"
-#define STR_GREETING "Hey! How are you doing?"
-#define STR_NOT_IMPLEMENTED "Not implemented yet!"
-#define STR_SSID_SET "SSID set to '%s'."
-#define STR_NULL_SSID_UNSUPPORTED "NULL SSIDs are not supported."
-#define STR_PASSWORD_SET "Password set to '%s'."
-#define STR_PASSWORD_SET_BLANK "Not using WiFi password."
-#define STR_CONNECTION_ERROR "Failed to connect"
-#define STR_DISCONNECTED "Disconnected."
-#define STR_SSID_MISSING "Please set an SSID."
-#define STR_UNREACHABLE_SSID "The SSID could not be reached."
-#define STR_CONNECTED_WITH_IP "Connected to '%s1' with IP %s2"
-#define STR_CONNECTION_FAILED "Failed to connect. Check password."
-#define STR_INVALID_ARGUMENTS "Invalid arguments."
-#define STR_SCANNING "Scanning networks..."
-#define STR_NETWORKS_FOUND "Networks found: "
-#define STR_NOT_CONNECTED "You are not connected."
-#define STR_OPEN_FAILED "Failed to open."
-#define STR_OPEN_SUCCESSFUL "Host connected."
-#define STR_OK "Ok."
-#define STR_NOT_SET "[NOT SET]"
-#define STR_YES "YES"
-#define STR_NO "NO"
-#define STR_DIRECTORY_USER_TITLE "Listing user files:"
-#define STR_DIRECTORY_SYSTEM_TITLE "Listing system files:"
-#define STR_DIRECTORY_EMPTY "  [Empty]"
-#define STR_DIRECTORY_ENTRY "  %d %s"
-#define STR_DIRECTORY_TOTAL "  Total: %d bytes"
-#define STR_DIRECTORY_USED "  Used : %d bytes"
-#define STR_DIRECTORY_FREE "  Free : %d bytes"
-#define STR_PLEASE_WAIT "Please wait."
-#define STR_FORMAT_PROMPT "THIS WILL ERASE ALL FILES! Continue? (y/n): "
-#define STR_FORMAT_OK "Format complete."
-#define STR_FORMAT_FAILED "Format error."
-#define STR_FORMAT_CANCELED "Format cancelled."
-#define STR_DEVICE_WILL_RESTART "Your device will restart soon."
-#define STR_USER_INPUT_YES "y"
-#define STR_COPY_COMPLETED "Copy complete."
-#define STR_ARGUMENT_CONFIG_SAVE "save"
-#define STR_ARGUMENT_CONFIG_LOAD "load"
-#define STR_ARGUMENT_FILES_SYSTEM "-s"
-#define STR_HOST_UNAVAILABLE "Host unavailable."
-#define STR_MONDAY "Monday"
-#define STR_TUESDAY "Tuesday"
-#define STR_WEDNESDAY "Wednesday"
-#define STR_THURSDAY "Thursday"
-#define STR_FRIDAY "Friday"
-#define STR_SATURDAY "Saturday"
-#define STR_SUNDAY "Sunday"
-#define STR_FILE_NOT_FOUND "File not found."
-#define STR_FILE_ERASE_SUCCESS "File erased."
-#define STR_FILE_ERASE_FAILED "File could not be erased"
-
-#define SND_BEEP 1
-#define SND_GOOD 2
-#define SND_ERROR 3
-#define SND_ALERT 4
-#define SND_CONNECTED 5
-
-#define guard(c,s) if(!(c)){writeln(s);return;}
-#define ntohl(n) ((((n&0xFF))<< 24)|(((n&0xFF00))<<8)|(((n&0xFF0000))>>8)|(((n&0xFF000000))>>24))
+#include "strings.h"
+#include "config.h"
+#include "other.h"
 
 // TYPE DEFINITIONS ------------------------------------------------------------
 typedef void (*CommandHandler)(String args);
