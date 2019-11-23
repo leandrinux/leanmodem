@@ -58,9 +58,10 @@ void cmd_xmodem_send(String args);
 void cmd_copy(String args);
 void cmd_time(String args);
 void cmd_erase(String args);
+void cmd_hexdump(String args);
 
 // CONSTANTS -------------------------------------------------------------------
-const int COMMAND_COUNT = 13;
+const int COMMAND_COUNT = 14;
 const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
   { "help", cmd_help },
   { "connect", cmd_connect },
@@ -74,7 +75,8 @@ const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
   { "xrecv", cmd_xmodem_recv },
   { "xsend", cmd_xmodem_send },
   { "time", cmd_time },
-  { "erase", cmd_erase }
+  { "erase", cmd_erase },
+  { "hexdump", cmd_hexdump }
 };
 
 // GLOBAL VARIABLES ------------------------------------------------------------
@@ -515,6 +517,43 @@ void cmd_erase(String args) {
   String filename = CFG_USER_DIRECTORY + args;
   guard(SPIFFS.exists(filename), STR_FILES_NOT_FOUND);
   writeln(SPIFFS.remove(filename) ? STR_FILES_ERASE_SUCCESS : STR_ERROR_UNKNOWN);
+}
+
+void cmd_hexdump(String args) {
+  guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
+  String filename = CFG_USER_DIRECTORY + args;
+  guard(SPIFFS.exists(filename), STR_FILES_NOT_FOUND);
+  #define CFG_HEXDUMP_LENGTH 16
+  char buffer[CFG_HEXDUMP_LENGTH];
+  char str[9];
+  File file = SPIFFS.open(filename, "r");
+  int count = file.readBytes(buffer, CFG_HEXDUMP_LENGTH);
+  int offset = 0;
+  byte val;
+  while (count) {
+    sprintf(str, "%08X", offset);
+    write(String(str) + ": ");  
+    offset += count;
+    for (byte i=0;i<count;i++) {
+      val = buffer[i];
+      sprintf(str, "%02X", val);
+      write(String(str));
+      if ((i+1)%4==0) write(" ");
+    }
+    val = 36 - (count * 2 + count / 4);
+    while (val>0) { write(" "); val--; }
+    write("|");
+    for (byte i=0;i<count;i++) {
+      val = buffer[i];
+      write(((val>=0x20)&&(val<=0x7e)) ? String((char)val) : ".");
+    }
+    write("|");
+    writeln();
+    count = file.readBytes(buffer, sizeof(buffer));
+  }
+  sprintf(str, "%08X", offset);
+  writeln(String(str));  
+  file.close();
 }
 
 CommandHandler findCommand(String cmd) {
