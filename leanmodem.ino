@@ -128,6 +128,10 @@ void write(byte *buffer, unsigned int size) {
   Serial.write(buffer, size);
 }
 
+void writeln() {
+  Serial.print(config.unix_eol ? "\n" : "\r\n");  
+}
+
 void writeln(String s) {
   Serial.print(s);
   Serial.print(config.unix_eol ? "\n" : "\r\n");
@@ -148,33 +152,33 @@ void config_changed(const char propertyName[12]) {
 // COMMAND HANDLERS ------------------------------------------------------------
 
 void cmd_help(String args) {
-  writeln(STR_NOT_IMPLEMENTED);
+  writeln(STR_ERROR_NOT_IMPLEMENTED);
 }
 
 void cmd_connect(String args) {
-  guard(*config.ssid, STR_SSID_MISSING);
+  guard(*config.ssid, STR_NETWORK_SSID_MISSING);
   WiFi.begin(config.ssid, config.pass);
   while (1)  {
     byte status = WiFi.status();
-    guards(status != WL_NO_SSID_AVAIL, STR_UNREACHABLE_SSID, SND_ERROR); 
+    guards(status != WL_NO_SSID_AVAIL, STR_NETWORK_SSID_UNREACHABLE, SND_ERROR); 
     if (status == WL_CONNECTED) {
       sound(SND_CONNECTED);
-      String msg = String(STR_CONNECTED_WITH_IP);
+      String msg = String(STR_NETWORK_CONNECTED_TO);
       msg.replace("%s1", config.ssid);
       msg.replace("%s2", WiFi.localIP().toString());
       writeln(msg);
       isConnected = true;
       break;
     }
-    guards(status != WL_CONNECT_FAILED, STR_CONNECTION_FAILED, SND_ERROR);
+    guards(status != WL_CONNECT_FAILED, STR_NETWORK_CONNECTION_FAILED, SND_ERROR);
     delay(100);
   }
 }
 
 void cmd_scan(String args) {
-  writeln(STR_SCANNING);
+  writeln(STR_NETWORK_SCANNING);
   int count = WiFi.scanNetworks();
-  writeln(STR_NETWORKS_FOUND + String(count));
+  writeln(STR_NETWORK_FOUND + String(count));
   for (int i = 0; i < count; i++) {
     writeln("   '" + String(WiFi.SSID(i).c_str()) + "', Ch:" + String(WiFi.channel(i)) + ", rssi:" + String(WiFi.RSSI(i)));
   }
@@ -183,14 +187,14 @@ void cmd_scan(String args) {
 
 void cmd_config(String args) {
   
-  if (args == STR_ARGUMENT_CONFIG_SAVE) {
+  if (args == STR_CONFIG_ARG_SAVE) {
     File file = SPIFFS.open(CFG_CONFIG_FILENAME, "w");
     file.write((byte *)&config, sizeof(config));
     file.close();
     return;
   }
   
-  if (args == STR_ARGUMENT_CONFIG_LOAD) {
+  if (args == STR_CONFIG_ARG_LOAD) {
     if (!SPIFFS.exists(CFG_CONFIG_FILENAME)) return;
     File file = SPIFFS.open(CFG_CONFIG_FILENAME, "r");
     file.read((byte *)&config, sizeof(config));
@@ -255,29 +259,29 @@ void cmd_config(String args) {
   
   if (args == "") {
     writeln("System Info:");
-    writeln("  Device ID  : " + ((*config.id) ? "'" + String(config.id) + "'" : String(STR_NOT_SET) ));
+    writeln("  Device ID  : " + ((*config.id) ? "'" + String(config.id) + "'" : String(STR_CONFIG_NOT_SET) ));
     writeln("  Timezone   : " + String(config.timezone));
-    writeln("");
+    writeln();
     writeln("Network Info:");
-    writeln("  SSID       : " + ((*config.ssid) ? "'" + String(config.ssid) + "'" : String(STR_NOT_SET) ));
-    writeln("  Password   : " + ((*config.pass) ? "'" + String(config.pass) + "'" : String(STR_NOT_SET) ));
-    writeln("  Connected  : " + String(isConnected ? "YES" : "NO") );
-    writeln("");
+    writeln("  SSID       : " + ((*config.ssid) ? "'" + String(config.ssid) + "'" : String(STR_CONFIG_NOT_SET) ));
+    writeln("  Password   : " + ((*config.pass) ? "'" + String(config.pass) + "'" : String(STR_CONFIG_NOT_SET) ));
+    writeln("  Connected  : " + String(isConnected ? STR_YES : STR_NO) );
+    writeln();
     writeln("System flags:");
-    writeln("  Sound       : " + String(config.sound ? "ON" : "OFF") );
-    writeln("  ANSI Codes  : " + String(config.ansi ? "ON" : "OFF") );  
-    writeln("  User Echo   : " + String(config.echo ? "ON" : "OFF") );
-    writeln("  Autoconnect : " + String(config.autoconnect ? "ON" : "OFF") );    
-    writeln("  Unix EOL    : " + String (config.unix_eol ? "ON" : "OFF"));
-    writeln("");
+    writeln("  Sound       : " + String(config.sound ? STR_ON : STR_OFF));
+    writeln("  ANSI Codes  : " + String(config.ansi ? STR_ON : STR_OFF));  
+    writeln("  User Echo   : " + String(config.echo ? STR_ON : STR_OFF));
+    writeln("  Autoconnect : " + String(config.autoconnect ? STR_ON : STR_OFF));    
+    writeln("  Unix EOL    : " + String (config.unix_eol ? STR_ON : STR_OFF));
+    writeln();
     return;
   }
-  writeln(STR_INVALID_ARGUMENTS);
+  writeln(STR_ERROR_INVALID_ARGUMENTS);
 }
 
 void cmd_telnet(String args) {
-  guard(isConnected, STR_NOT_CONNECTED);
-  guard(args != "", STR_INVALID_ARGUMENTS);
+  guard(isConnected, STR_ERROR_NOT_CONNECTED);
+  guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   String host = "";
   int port = 23;
   int i = args.indexOf(':');
@@ -288,7 +292,7 @@ void cmd_telnet(String args) {
     host = args;
   }  
   WiFiClient client;
-  guards(client.connect(host, port), STR_OPEN_FAILED, SND_ERROR);
+  guards(client.connect(host, port), STR_NETWORK_CONNECTION_FAILED, SND_ERROR);
   int key = -1;
   byte buffer[CFG_TELNET_BUFFER_SIZE];
   int count = 0;
@@ -305,45 +309,47 @@ void cmd_telnet(String args) {
   }
   client.stop();
   delay(1);
-  writeln("");
-  writeln(STR_DISCONNECTED);
+  writeln();
+  writeln(STR_NETWORK_DISCONNECTED);
   sound(SND_BEEP);
 }
 
 void cmd_restart(String args) {
+  writeln(STR_SYSTEM_WILL_RESTART);
+  delay(500);
   ESP.restart();
 }
 
 void cmd_files(String args) {
   String directory;
-  if (args == STR_ARGUMENT_FILES_SYSTEM) {
-    writeln(STR_DIRECTORY_SYSTEM_TITLE);
+  if (args == STR_FILES_ARG_SYSTEM) {
+    writeln(STR_FILES_SYSTEM_TITLE);
     directory = CFG_SYSTEM_DIRECTORY;
   } else {
-    writeln(STR_DIRECTORY_USER_TITLE);
+    writeln(STR_FILES_USER_TITLE);
     directory = CFG_USER_DIRECTORY;    
   }
   Dir dir = SPIFFS.openDir(directory);
   bool empty = true;
   while (dir.next()) {
     empty = false;
-    String msg = String(STR_DIRECTORY_ENTRY);
+    String msg = String(STR_FILES_ENTRY);
     String filename = dir.fileName().substring(directory.length());
     msg.replace("%s", filename);
     msg.replace("%d", String(dir.fileSize()));
     writeln(msg);
   }
-  if (empty) writeln(STR_DIRECTORY_EMPTY); 
+  if (empty) writeln(STR_FILES_EMPTY); 
   FSInfo fs_info;
   SPIFFS.info(fs_info);
   String msg;
-  msg = String(STR_DIRECTORY_TOTAL);
+  msg = String(STR_FILES_TOTAL_BYTES);
   msg.replace("%d", String(fs_info.totalBytes));
   writeln(msg);
-  msg = String(STR_DIRECTORY_USED);
+  msg = String(STR_FILES_USED_BYTES);
   msg.replace("%d", String(fs_info.usedBytes));
   writeln(msg);
-  msg = String(STR_DIRECTORY_FREE);
+  msg = String(STR_FILES_FREE_BYTES);
   msg.replace("%d", String(fs_info.totalBytes - fs_info.usedBytes));
   writeln(msg);    
 }
@@ -353,27 +359,25 @@ void cmd_format(String args) {
   write(STR_FORMAT_PROMPT);
   String userInput = readln();
   guard(userInput == STR_USER_INPUT_YES, STR_FORMAT_CANCELED);
-  writeln(STR_PLEASE_WAIT);
+  writeln(STR_WAIT);
   bool success = SPIFFS.format();
   writeln(success ? STR_FORMAT_OK : STR_FORMAT_FAILED);
-  writeln(STR_DEVICE_WILL_RESTART);
   SPIFFS.end();
-  delay(500);
   cmd_restart("");
 }
 
 void cmd_copy(String args) {  
-  guard(args != "", STR_INVALID_ARGUMENTS);
+  guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   int i = args.indexOf(' ');
-  guard(i != -1, STR_INVALID_ARGUMENTS);
+  guard(i != -1, STR_ERROR_INVALID_ARGUMENTS);
   String inputArg = args.substring(0, i);
   String outputArg = args.substring(i+1);
   Stream *input = NULL;
   Stream *output = NULL;
   File inputFile;
   File outputFile;
-  guard(inputArg != "stdout", STR_INVALID_ARGUMENTS);
-  guard(outputArg != "stdin", STR_INVALID_ARGUMENTS);
+  guard(inputArg != "stdout", STR_ERROR_INVALID_ARGUMENTS);
+  guard(outputArg != "stdin", STR_ERROR_INVALID_ARGUMENTS);
   
   if (inputArg == "stdin") {
     input = &Serial;
@@ -391,8 +395,8 @@ void cmd_copy(String args) {
     if (outputFile) output = &outputFile;
   }
   
-  guard(input != NULL, STR_INVALID_ARGUMENTS);
-  guard(output != NULL, STR_INVALID_ARGUMENTS);
+  guard(input != NULL, STR_ERROR_INVALID_ARGUMENTS);
+  guard(output != NULL, STR_ERROR_INVALID_ARGUMENTS);
   input->setTimeout(5000);
   size_t count = 1;
   char buffer[CFG_COPY_BUFFER_SIZE];
@@ -403,7 +407,7 @@ void cmd_copy(String args) {
   input->setTimeout(1000);
   inputFile.close();
   outputFile.close();
-  if (outputArg != "stdout") writeln(STR_COPY_COMPLETED);
+  if (outputArg != "stdout") writeln(STR_FILES_COPY_COMPLETED);
 }
 
 void cmd_xmodem_recv(String args) {
@@ -443,21 +447,29 @@ void cmd_xmodem_send(String args) {
 }
 
 void cmd_time(String args) {
-  guard(isConnected, STR_NOT_CONNECTED);
+  guard(isConnected, STR_ERROR_NOT_CONNECTED);
   WiFiUDP ntpUDP;
   NTPClient timeClient(ntpUDP, CFG_NTP_SERVER, config.timezone * 3600);
   timeClient.begin();
   timeClient.update();
-  char daysOfTheWeek[7][12] = {STR_SUNDAY, STR_MONDAY, STR_TUESDAY, STR_WEDNESDAY, STR_THURSDAY, STR_FRIDAY, STR_SATURDAY};
+  char daysOfTheWeek[7][12] = {
+    STR_CALENDAR_DAY_SUNDAY, 
+    STR_CALENDAR_DAY_MONDAY, 
+    STR_CALENDAR_DAY_TUESDAY, 
+    STR_CALENDAR_DAY_WEDNESDAY, 
+    STR_CALENDAR_DAY_THURSDAY, 
+    STR_CALENDAR_DAY_FRIDAY, 
+    STR_CALENDAR_DAY_SATURDAY
+  };
   writeln(timeClient.getFullFormattedTime());
   timeClient.end();
 }
 
 void cmd_erase(String args) {
-  guard(args != "", STR_INVALID_ARGUMENTS);
+  guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   String filename = CFG_USER_DIRECTORY + args;
-  guard(SPIFFS.exists(filename), STR_FILE_NOT_FOUND);
-  writeln(SPIFFS.remove(filename) ? STR_FILE_ERASE_SUCCESS : STR_FILE_ERASE_FAILED);
+  guard(SPIFFS.exists(filename), STR_FILES_NOT_FOUND);
+  writeln(SPIFFS.remove(filename) ? STR_FILES_ERASE_SUCCESS : STR_ERROR_UNKNOWN);
 }
 
 CommandHandler findCommand(String cmd) {
@@ -483,7 +495,7 @@ void parseCommand(String userInput) {
   cmd.replace("\r","");
   CommandHandler handler = findCommand(cmd);
   if (handler == NULL) {
-    String errorMessage = String(STR_COMMAND_UNRECOGNIZED);
+    String errorMessage = String(STR_ERROR_COMMAND_UNRECOGNIZED);
     errorMessage.replace("%s", cmd);
     writeln(errorMessage);
     return;
@@ -496,19 +508,19 @@ void parseCommand(String userInput) {
 void setup() {
   Serial.begin(CFG_CONSOLE_BAUD_RATE);
   delay(CFG_STARTUP_DELAY);
-  writeln(STR_BOOT_PRE_MESSAGE);
+  writeln(STR_SYSTEM_PRE);
 
   sound_setPin(CFG_BUZZER_PIN);
   SPIFFS.begin();
   SPIFFS.gc();
-  cmd_config(STR_ARGUMENT_CONFIG_LOAD);
+  cmd_config(STR_CONFIG_ARG_LOAD);
   if (config.autoconnect && *config.ssid) cmd_connect("");
 
-  writeln(STR_BOOT_POST_MESSAGE);
+  writeln(STR_SYSTEM_POST);
 }
 
 void loop() {
-  if (config.echo) Serial.print(STR_COMMAND_PROMPT);
+  if (config.echo) Serial.print(STR_SYSTEM_PROMPT);
   String userInput = readln();
   if (userInput != "") parseCommand(userInput);
 }
