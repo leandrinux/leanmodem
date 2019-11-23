@@ -13,6 +13,7 @@
 #include "strings.h"
 #include "config.h"
 #include "other.h"
+#include "sound.h"
 
 // TYPE DEFINITIONS ------------------------------------------------------------
 typedef void (*CommandHandler)(String args);
@@ -132,38 +133,16 @@ void writeln(String s) {
   Serial.print(config.unix_eol ? "\n" : "\r\n");
 }
 
-void sound(byte type) {
-  if (!config.sound) return;
-  switch (type) {
-    case SND_BEEP:
-      tone(CFG_BUZZER_PIN, 1000, 100);
-      break;
-    case SND_GOOD:
-      tone(CFG_BUZZER_PIN, 500, 100);
-      break;
-    case SND_ERROR:
-      tone(CFG_BUZZER_PIN, 400, 30); delay(40);
-      tone(CFG_BUZZER_PIN, 400, 30); delay(40);
-      tone(CFG_BUZZER_PIN, 400, 30); delay(40);
-      break;
-    case SND_ALERT:
-      for (int i=500;i<1000;i+=10) { tone(CFG_BUZZER_PIN, i, 3); delay(3); }
-      for (int i=1000;i>500;i-=10) { tone(CFG_BUZZER_PIN, i, 3); delay(3); }
-      break;
-    case SND_CONNECTED:
-      tone(CFG_BUZZER_PIN, 800, 30); delay(30);
-      tone(CFG_BUZZER_PIN, 1000, 30); delay(30);
-      tone(CFG_BUZZER_PIN, 1200, 30); delay(30);
-      break;
-  }
-}
-
 String sanitize(String input) {
   if (config.ansi) {
     return input;
   } else {
     return input;   
   }
+}
+
+void config_changed(const char propertyName[12]) {
+  sound_setMute(!config.sound);
 }
 
 // COMMAND HANDLERS ------------------------------------------------------------
@@ -177,11 +156,7 @@ void cmd_connect(String args) {
   WiFi.begin(config.ssid, config.pass);
   while (1)  {
     byte status = WiFi.status();
-    if (status == WL_NO_SSID_AVAIL) {
-      writeln(STR_UNREACHABLE_SSID);
-      sound(SND_ERROR);
-      break;
-    }
+    guards(status != WL_NO_SSID_AVAIL, STR_UNREACHABLE_SSID, SND_ERROR); 
     if (status == WL_CONNECTED) {
       sound(SND_CONNECTED);
       String msg = String(STR_CONNECTED_WITH_IP);
@@ -191,14 +166,9 @@ void cmd_connect(String args) {
       isConnected = true;
       break;
     }
-    if (status == WL_CONNECT_FAILED) {
-      writeln(STR_CONNECTION_FAILED);
-      sound(SND_ERROR);
-      break;
-    }
-    delay(500);
+    guards(status != WL_CONNECT_FAILED, STR_CONNECTION_FAILED, SND_ERROR);
+    delay(100);
   }
-
 }
 
 void cmd_scan(String args) {
@@ -225,6 +195,7 @@ void cmd_config(String args) {
     File file = SPIFFS.open(CFG_CONFIG_FILENAME, "r");
     file.read((byte *)&config, sizeof(config));
     file.close();
+    config_changed(NULL);
     return;
   }
 
@@ -236,11 +207,10 @@ void cmd_config(String args) {
       i = temp.indexOf(' ');
       String propertyName = (i<0) ? temp : temp.substring(0, i);
       String propertyValue = (i<0) ? "" : temp.substring(i+1);
-
       enum FieldType { string = 0, number = 1, boolean = 2 };
       const int q = 9;
       const struct {
-        char name[12];
+        char propertyName[12];
         void *pointer;
         FieldType fieldType;
       } SETTINGS[q] = {
@@ -255,22 +225,26 @@ void cmd_config(String args) {
         { "timezone", &config.timezone, number }
       };
       int j = 0;
-      while ((j < q) && (String(SETTINGS[j].name) != propertyName)) { j++; };
+      while ((j < q) && (String(SETTINGS[j].propertyName) != propertyName)) { j++; };
       if (j < q) {
         switch (SETTINGS[j].fieldType) {
           case string:
             propertyValue.toCharArray((char *)SETTINGS[j].pointer, 30);
+            config_changed(SETTINGS[j].propertyName);
             return;
           case number:
             *(int *)SETTINGS[j].pointer = propertyValue.toInt();
+            config_changed(SETTINGS[j].propertyName);
             return;
           case boolean:
             if (propertyValue == "on") {
               *(char *)SETTINGS[j].pointer = true;
+              config_changed(SETTINGS[j].propertyName);
               return;
             }
             if (propertyValue == "off") {
               *(char *)SETTINGS[j].pointer = false;
+              config_changed(SETTINGS[j].propertyName);
               return;
             }
             break;
@@ -302,14 +276,8 @@ void cmd_config(String args) {
 }
 
 void cmd_telnet(String args) {
-  if (!isConnected) {
-    writeln(STR_NOT_CONNECTED);
-    return;
-  }
-  if (args == "") {
-    writeln(STR_INVALID_ARGUMENTS);
-    return;
-  }
+  guard(isConnected, STR_NOT_CONNECTED);
+  guard(args != "", STR_INVALID_ARGUMENTS);
   String host = "";
   int port = 23;
   int i = args.indexOf(':');
@@ -318,34 +286,28 @@ void cmd_telnet(String args) {
     host = args.substring(0, i);
   } else {
     host = args;
-  }
-  
+  }  
   WiFiClient client;
-  if (client.connect(host, port)) {
-    int key = -1;
-    byte buffer[CFG_TELNET_BUFFER_SIZE];
-    int count = 0;
-    while ((key != CFG_TELNET_BREAK_KEYCODE) && (client.connected() || client.available())) {      
-      if (client.available()) {
-        count = client.readBytes(buffer, CFG_TELNET_BUFFER_SIZE);
-        write(buffer, count);        
-      }
-      if (available()) {
-        count = read(buffer, CFG_TELNET_BUFFER_SIZE);
-        client.write(buffer, count);
-        key = (count > 0) ? int(buffer[0]) : -1; 
-      }
+  guards(client.connect(host, port), STR_OPEN_FAILED, SND_ERROR);
+  int key = -1;
+  byte buffer[CFG_TELNET_BUFFER_SIZE];
+  int count = 0;
+  while ((key != CFG_TELNET_BREAK_KEYCODE) && (client.connected() || client.available())) {      
+    if (client.available()) {
+      count = client.readBytes(buffer, CFG_TELNET_BUFFER_SIZE);
+      write(buffer, count);        
     }
-    client.stop();
-    delay(1);
-    writeln("");
-    writeln(STR_DISCONNECTED);
-    sound(SND_BEEP);
-  } else {
-    writeln(STR_OPEN_FAILED);
-    sound(SND_ERROR);
+    if (available()) {
+      count = read(buffer, CFG_TELNET_BUFFER_SIZE);
+      client.write(buffer, count);
+      key = (count > 0) ? int(buffer[0]) : -1; 
+    }
   }
-
+  client.stop();
+  delay(1);
+  writeln("");
+  writeln(STR_DISCONNECTED);
+  sound(SND_BEEP);
 }
 
 void cmd_restart(String args) {
@@ -390,23 +352,17 @@ void cmd_format(String args) {
   sound(SND_ALERT);
   write(STR_FORMAT_PROMPT);
   String userInput = readln();
-  if (userInput == STR_USER_INPUT_YES) {
-    writeln(STR_PLEASE_WAIT);
-    bool success = SPIFFS.format();
-    writeln(success ? STR_FORMAT_OK : STR_FORMAT_FAILED);
-    writeln(STR_DEVICE_WILL_RESTART);
-    SPIFFS.end();
-    delay(1000);
-    cmd_restart("");
-  } else {
-    if (!config.echo) writeln("");
-    writeln(STR_FORMAT_CANCELED);
-  }
+  guard(userInput == STR_USER_INPUT_YES, STR_FORMAT_CANCELED);
+  writeln(STR_PLEASE_WAIT);
+  bool success = SPIFFS.format();
+  writeln(success ? STR_FORMAT_OK : STR_FORMAT_FAILED);
+  writeln(STR_DEVICE_WILL_RESTART);
+  SPIFFS.end();
+  delay(500);
+  cmd_restart("");
 }
 
-void cmd_copy(String args) {
-  #define CFG_COPY_BUFFER_SIZE 1024
-  
+void cmd_copy(String args) {  
   guard(args != "", STR_INVALID_ARGUMENTS);
   int i = args.indexOf(' ');
   guard(i != -1, STR_INVALID_ARGUMENTS);
@@ -451,17 +407,7 @@ void cmd_copy(String args) {
 }
 
 void cmd_xmodem_recv(String args) {
-  
-  #define XMODEM_SOH 0x01 // start of header
-  #define XMODEM_EOT 0x04 // end of transmission
-  #define XMODEM_ACK 0x06 // acknowledge
-  #define XMODEM_NAK 0x15 // not acknowledge
-  #define XMODEM_ETB 0x17 // end of transmission block
-  #define XMODEM_CAN 0x18 // cancel
-  #define XMODEM_C 0x43   // ascii c
-  #define XMODEM_BUFFER_SIZE 20
-  #define XMODEM_MAX_RETRIES 6
-  
+    
   // send C's until there's a response
   // until not eot 
   //  receive packet
@@ -551,10 +497,13 @@ void setup() {
   Serial.begin(CFG_CONSOLE_BAUD_RATE);
   delay(CFG_STARTUP_DELAY);
   writeln(STR_BOOT_PRE_MESSAGE);
+
+  sound_setPin(CFG_BUZZER_PIN);
   SPIFFS.begin();
   SPIFFS.gc();
   cmd_config(STR_ARGUMENT_CONFIG_LOAD);
   if (config.autoconnect && *config.ssid) cmd_connect("");
+
   writeln(STR_BOOT_POST_MESSAGE);
 }
 
