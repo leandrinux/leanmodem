@@ -21,7 +21,6 @@
 #define CFG_TELNET_BUFFER_SIZE 2048
 #define CFG_XMODEM_TIMEOUT 2000
 #define CFG_NTP_SERVER "pool.ntp.org"
-#define CFG_TIMEZONE -3
 
 // STRINGS ---------------------------------------------------------------------
 #define STR_COMMAND_PROMPT "> "
@@ -34,7 +33,6 @@
 #define STR_NULL_SSID_UNSUPPORTED "NULL SSIDs are not supported."
 #define STR_PASSWORD_SET "Password set to '%s'."
 #define STR_PASSWORD_SET_BLANK "Not using WiFi password."
-#define STR_CONNECTING "Connecting..."
 #define STR_CONNECTION_ERROR "Failed to connect"
 #define STR_DISCONNECTED "Disconnected."
 #define STR_SSID_MISSING "Please set an SSID."
@@ -99,8 +97,10 @@ typedef struct {
 }  CommandEntry;
 
 typedef struct {
+  char id[11];
   char ssid[31];
   char pass[31];
+  int timezone;
   bool unix_eol;
   bool sound;
   bool ansi;
@@ -151,15 +151,7 @@ const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
 };
 
 // GLOBAL VARIABLES ------------------------------------------------------------
-Config config = {
-  "leandro",
-  "lala",
-  false,
-  true,
-  true,
-  true,
-  true
-};
+Config config = { "default", "", "", 0, false, true, true, true, true };
 
 bool isConnected = false;
 
@@ -256,7 +248,6 @@ void cmd_help(String args) {
 
 void cmd_connect(String args) {
   guard(*config.ssid, STR_SSID_MISSING);
-  writeln(STR_CONNECTING);
   WiFi.begin(config.ssid, config.pass);
   while (1)  {
     byte status = WiFi.status();
@@ -318,42 +309,55 @@ void cmd_config(String args) {
       String temp = args.substring(i+1);
       i = temp.indexOf(' ');
       String propertyName = (i<0) ? temp : temp.substring(0, i);
-      String propertyValue = (i<0) ? "" : temp.substring(i+1);       
-      const int q = 7;
+      String propertyValue = (i<0) ? "" : temp.substring(i+1);
+
+      enum FieldType { string = 0, number = 1, boolean = 2 };
+      const int q = 9;
       const struct {
         char name[12];
         void *pointer;
-        bool isBool;
+        FieldType fieldType;
       } SETTINGS[q] = {
-        { "ssid", &config.ssid, false },
-        { "pass", &config.pass, false },
-        { "sound", &config.sound, true },
-        { "ansi", &config.ansi, true },
-        { "echo", &config.echo, true },
-        { "autoconnect", &config.autoconnect, true },
-        { "unix", &config.unix_eol, true }
+        { "id", &config.id, string },
+        { "ssid", &config.ssid, string },
+        { "pass", &config.pass, string },
+        { "sound", &config.sound, boolean },
+        { "ansi", &config.ansi, boolean },
+        { "echo", &config.echo, boolean },
+        { "autoconnect", &config.autoconnect, boolean },
+        { "unix", &config.unix_eol, boolean },
+        { "timezone", &config.timezone, number }
       };
       int j = 0;
       while ((j < q) && (String(SETTINGS[j].name) != propertyName)) { j++; };
       if (j < q) {
-        if (SETTINGS[j].isBool) {
-          if (propertyValue == "on") {
-            *(char *)SETTINGS[j].pointer = true;
+        switch (SETTINGS[j].fieldType) {
+          case string:
+            propertyValue.toCharArray((char *)SETTINGS[j].pointer, 30);
             return;
-          }
-          if (propertyValue == "off") {
-            *(char *)SETTINGS[j].pointer = false;
+          case number:
+            *(int *)SETTINGS[j].pointer = propertyValue.toInt();
             return;
-          }
-        } else {
-          propertyValue.toCharArray((char *)SETTINGS[j].pointer, 30);
-          return;
+          case boolean:
+            if (propertyValue == "on") {
+              *(char *)SETTINGS[j].pointer = true;
+              return;
+            }
+            if (propertyValue == "off") {
+              *(char *)SETTINGS[j].pointer = false;
+              return;
+            }
+            break;
         }
       }
     }
   }
   
   if (args == "") {
+    writeln("System Info:");
+    writeln("  Device ID  : " + ((*config.id) ? "'" + String(config.id) + "'" : String(STR_NOT_SET) ));
+    writeln("  Timezone   : " + String(config.timezone));
+    writeln("");
     writeln("Network Info:");
     writeln("  SSID       : " + ((*config.ssid) ? "'" + String(config.ssid) + "'" : String(STR_NOT_SET) ));
     writeln("  Password   : " + ((*config.pass) ? "'" + String(config.pass) + "'" : String(STR_NOT_SET) ));
@@ -569,7 +573,7 @@ void cmd_xmodem_send(String args) {
 void cmd_time(String args) {
   guard(isConnected, STR_NOT_CONNECTED);
   WiFiUDP ntpUDP;
-  NTPClient timeClient(ntpUDP, CFG_NTP_SERVER, CFG_TIMEZONE * 3600);
+  NTPClient timeClient(ntpUDP, CFG_NTP_SERVER, config.timezone * 3600);
   timeClient.begin();
   timeClient.update();
   char daysOfTheWeek[7][12] = {STR_SUNDAY, STR_MONDAY, STR_TUESDAY, STR_WEDNESDAY, STR_THURSDAY, STR_FRIDAY, STR_SATURDAY};
