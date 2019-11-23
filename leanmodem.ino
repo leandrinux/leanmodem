@@ -258,21 +258,25 @@ void cmd_config(String args) {
   }
   
   if (args == "") {
-    writeln("System Info:");
-    writeln("  Device ID  : " + ((*config.id) ? "'" + String(config.id) + "'" : String(STR_CONFIG_NOT_SET) ));
+    #define CFG_STRING(val) ((*val) ? "'" + String(val) + "'" : String(STR_CONFIG_NOT_SET) )
+    #define CFG_BOOL(val) String(val ? STR_YES : STR_NO)
+    String uptime = String(millis()/1000) + " secs";    
+    writeln("SYSTEM INFO");
+    writeln("  Device ID  : " + CFG_STRING(config.id));
     writeln("  Timezone   : " + String(config.timezone));
+    writeln("  Uptime     : " + String(uptime));
     writeln();
-    writeln("Network Info:");
-    writeln("  SSID       : " + ((*config.ssid) ? "'" + String(config.ssid) + "'" : String(STR_CONFIG_NOT_SET) ));
-    writeln("  Password   : " + ((*config.pass) ? "'" + String(config.pass) + "'" : String(STR_CONFIG_NOT_SET) ));
-    writeln("  Connected  : " + String(isConnected ? STR_YES : STR_NO) );
+    writeln("NETWORK INFO");
+    writeln("  SSID     : " + CFG_STRING(config.ssid));
+    writeln("  Password : " + CFG_STRING(config.pass));
+    writeln("  WiFi     : " + CFG_BOOL(isConnected));
     writeln();
-    writeln("System flags:");
-    writeln("  Sound       : " + String(config.sound ? STR_ON : STR_OFF));
-    writeln("  ANSI Codes  : " + String(config.ansi ? STR_ON : STR_OFF));  
-    writeln("  User Echo   : " + String(config.echo ? STR_ON : STR_OFF));
-    writeln("  Autoconnect : " + String(config.autoconnect ? STR_ON : STR_OFF));    
-    writeln("  Unix EOL    : " + String (config.unix_eol ? STR_ON : STR_OFF));
+    writeln("SYSTEM FLAGS");
+    writeln("  Sound       : " + CFG_BOOL(config.sound));
+    writeln("  ANSI Codes  : " + CFG_BOOL(config.ansi));  
+    writeln("  User Echo   : " + CFG_BOOL(config.echo));
+    writeln("  Autoconnect : " + CFG_BOOL(config.autoconnect));
+    writeln("  Unix EOL    : " + CFG_BOOL(config.unix_eol));
     writeln();
     return;
   }
@@ -376,10 +380,10 @@ void cmd_copy(String args) {
   Stream *output = NULL;
   File inputFile;
   File outputFile;
-  guard(inputArg != "stdout", STR_ERROR_INVALID_ARGUMENTS);
-  guard(outputArg != "stdin", STR_ERROR_INVALID_ARGUMENTS);
+  guard(inputArg != STR_COPY_STANDARD_OUTPUT, STR_ERROR_INVALID_ARGUMENTS);
+  guard(outputArg != STR_COPY_STANDARD_INPUT, STR_ERROR_INVALID_ARGUMENTS);
   
-  if (inputArg == "stdin") {
+  if (inputArg == STR_COPY_STANDARD_INPUT) {
     input = &Serial;
   } else {
     String filename = String(CFG_USER_DIRECTORY) + inputArg;
@@ -387,7 +391,7 @@ void cmd_copy(String args) {
     if (inputFile) input = &inputFile;
   }
   
-  if (outputArg == "stdout") {
+  if (outputArg == STR_COPY_STANDARD_OUTPUT) {
     output = &Serial;
   } else {
     String filename = String(CFG_USER_DIRECTORY) + outputArg;
@@ -452,15 +456,6 @@ void cmd_time(String args) {
   NTPClient timeClient(ntpUDP, CFG_NTP_SERVER, config.timezone * 3600);
   timeClient.begin();
   timeClient.update();
-  char daysOfTheWeek[7][12] = {
-    STR_CALENDAR_DAY_SUNDAY, 
-    STR_CALENDAR_DAY_MONDAY, 
-    STR_CALENDAR_DAY_TUESDAY, 
-    STR_CALENDAR_DAY_WEDNESDAY, 
-    STR_CALENDAR_DAY_THURSDAY, 
-    STR_CALENDAR_DAY_FRIDAY, 
-    STR_CALENDAR_DAY_SATURDAY
-  };
   writeln(timeClient.getFullFormattedTime());
   timeClient.end();
 }
