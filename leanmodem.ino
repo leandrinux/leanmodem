@@ -9,6 +9,7 @@
 #include <FS.h>
 #include <WiFiUdp.h>
 #include <NTPClient.h>
+#include <SHA256.h>
 
 #include "strings.h"
 #include "config.h"
@@ -59,9 +60,10 @@ void cmd_copy(String args);
 void cmd_time(String args);
 void cmd_erase(String args);
 void cmd_hexdump(String args);
+void cmd_sha256(String args);
 
 // CONSTANTS -------------------------------------------------------------------
-const int COMMAND_COUNT = 14;
+const int COMMAND_COUNT = 15;
 const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
   { "help", cmd_help },
   { "connect", cmd_connect },
@@ -76,7 +78,8 @@ const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
   { "xsend", cmd_xmodem_send },
   { "time", cmd_time },
   { "erase", cmd_erase },
-  { "hexdump", cmd_hexdump }
+  { "hexdump", cmd_hexdump },
+  { "sha256", cmd_sha256 }
 };
 
 // GLOBAL VARIABLES ------------------------------------------------------------
@@ -553,6 +556,31 @@ void cmd_hexdump(String args) {
   }
   sprintf(str, "%08X", offset);
   writeln(String(str));  
+  file.close();
+}
+
+void cmd_sha256(String args) {
+  guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
+  String filename = CFG_USER_DIRECTORY + args;
+  guard(SPIFFS.exists(filename), STR_FILES_NOT_FOUND);
+  File file = SPIFFS.open(filename, "r");
+  const int BUFFER_SIZE = 1024;
+  char buffer[BUFFER_SIZE];
+  int count = file.readBytes(buffer, BUFFER_SIZE);
+  SHA256 sha;
+  while (count) {
+    sha.update(&buffer, count);
+    count = file.readBytes(buffer, BUFFER_SIZE);
+  }
+  int size = sha.hashSize();
+  byte hash[size];
+  char str[3];
+  sha.finalize(hash, size);
+  for (int i=0;i<size;i++) {
+    sprintf(str, "%02X", hash[i]);
+    write(String(str));
+  }
+  writeln();
   file.close();
 }
 
