@@ -341,18 +341,19 @@ void cmd_files(String args) {
   }
   Dir dir = SPIFFS.openDir(directory);
   bool empty = true;
+  String msg, filename;
   while (dir.next()) {
     empty = false;
-    String msg = String(STR_FILES_ENTRY);
-    String filename = dir.fileName().substring(directory.length());
+    msg = String(STR_FILES_ENTRY);
+    filename = dir.fileName().substring(directory.length());
     msg.replace("%s", filename);
     msg.replace("%d", String(dir.fileSize()));
     writeln(msg);
   }
-  if (empty) writeln(STR_FILES_EMPTY); 
+  if (empty) writeln(STR_FILES_EMPTY);
+  writeln();
   FSInfo fs_info;
   SPIFFS.info(fs_info);
-  String msg;
   msg = String(STR_FILES_TOTAL_BYTES);
   msg.replace("%d", String(fs_info.totalBytes));
   writeln(msg);
@@ -430,11 +431,12 @@ void cmd_copy(String args) {
       host = uri.substring(0, a);
     }
     guard(inputClient.connect(host, port), STR_NETWORK_HOST_UNAVAILABLE);
-    inputClient.println("GET " + path + " HTTP/1.1");
+    inputClient.println("GET " + path + " HTTP/1.0");
     inputClient.println("Host: " + host);
+    inputClient.println("Accept-Encoding: identity");
     inputClient.println();
     String header = inputClient.readStringUntil('\n');
-    guard(header == "HTTP/1.1 200 OK\r", header);
+    guard(header == "HTTP/1.0 200 OK\r", header);
     while (header != "\r") {
       header = inputClient.readStringUntil('\n');      
     }
