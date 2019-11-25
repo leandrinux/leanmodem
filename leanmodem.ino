@@ -26,10 +26,11 @@ typedef struct {
 }  CommandEntry;
 
 typedef struct {
-  char id[11];
   char ssid[31];
   char pass[31];
-  int timezone;
+  char id[11];
+  short int timezone;
+  short int timeout;
   bool unix_eol;
   bool sound;
   bool ansi;
@@ -84,7 +85,7 @@ const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
 };
 
 // GLOBAL VARIABLES ------------------------------------------------------------
-Config config = { "default", "", "", 0, false, true, true, true, true };
+Config config = { "", "", "default", 0, 3000, false, true, true, true, true };
 
 bool isConnected = false;
 
@@ -218,7 +219,7 @@ void cmd_config(String args) {
       String propertyName = (i<0) ? temp : temp.substring(0, i);
       String propertyValue = (i<0) ? "" : temp.substring(i+1);
       enum FieldType { string = 0, number = 1, boolean = 2 };
-      const int q = 9;
+      const int q = 10;
       const struct {
         char propertyName[12];
         void *pointer;
@@ -232,7 +233,8 @@ void cmd_config(String args) {
         { "echo", &config.echo, boolean },
         { "autoconnect", &config.autoconnect, boolean },
         { "unix", &config.unix_eol, boolean },
-        { "timezone", &config.timezone, number }
+        { "timezone", &config.timezone, number },
+        { "timeout", &config.timeout, number }
       };
       int j = 0;
       while ((j < q) && (String(SETTINGS[j].propertyName) != propertyName)) { j++; };
@@ -243,7 +245,7 @@ void cmd_config(String args) {
             config_changed(SETTINGS[j].propertyName);
             return;
           case number:
-            *(int *)SETTINGS[j].pointer = propertyValue.toInt();
+            *(short int *)SETTINGS[j].pointer = propertyValue.toInt();
             config_changed(SETTINGS[j].propertyName);
             return;
           case boolean:
@@ -277,6 +279,7 @@ void cmd_config(String args) {
     writeln("  SSID     : " + CFG_STRING(config.ssid));
     writeln("  Password : " + CFG_STRING(config.pass));
     writeln("  WiFi     : " + CFG_BOOL(isConnected));
+    writeln("  Timeout  : " + String(config.timeout));
     writeln();
     writeln("SYSTEM FLAGS");
     writeln("  Sound       : " + CFG_BOOL(config.sound));
@@ -426,7 +429,7 @@ void cmd_copy(String args) {
   
   guard(input != NULL, STR_ERROR_INVALID_ARGUMENTS);
   guard(output != NULL, STR_ERROR_INVALID_ARGUMENTS);
-  input->setTimeout(5000);
+  input->setTimeout(config.timeout);
   size_t count = 1;
   char buffer[CFG_COPY_BUFFER_SIZE];
   while (count > 0) {
