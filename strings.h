@@ -35,7 +35,6 @@
 #define STR_FILES_ARG_SYSTEM "-s"
 #define STR_FILES_NOT_FOUND "File not found"
 #define STR_FILES_ERASE_SUCCESS "File erased"
-#define STR_FILES_COPY_COMPLETED "Copy complete"
 
 #define STR_COPY_STANDARD_INPUT "stdin"
 #define STR_COPY_STANDARD_OUTPUT "stdout"

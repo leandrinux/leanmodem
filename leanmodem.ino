@@ -15,6 +15,7 @@
 #include "config.h"
 #include "other.h"
 #include "sound.h"
+#include "http.h"
 
 // TYPE DEFINITIONS ------------------------------------------------------------
 typedef void (*CommandHandler)(String args);
@@ -404,42 +405,9 @@ void cmd_copy(String args) {
     input = &inputClient;
   } else if (inputArg.startsWith(STR_COPY_HTTP_PREFIX)) {
     guard(isConnected, STR_NETWORK_UNAVAILABLE);
-    String uri = inputArg.substring(String(STR_COPY_HTTP_PREFIX).length());
-    String host;
-    String path;
-    int port;
-    int a = uri.indexOf(':');
-    if (a < 0) {
-      port = 80;
-      int b = uri.indexOf('/');
-      if (b < 0) {
-        b = uri.length();
-        path = "/";
-      } else {
-        path = uri.substring(b);
-      }
-      host = uri.substring(0, b);
-    } else {
-      int b = uri.indexOf('/', a + 1);
-      if (b < 0) {
-        b = uri.length();
-        path = "/";
-      } else {
-        path = uri.substring(b);
-      }
-      port = uri.substring(a + 1, b).toInt();
-      host = uri.substring(0, a);
-    }
-    guard(inputClient.connect(host, port), STR_NETWORK_HOST_UNAVAILABLE);
-    inputClient.println("GET " + path + " HTTP/1.0");
-    inputClient.println("Host: " + host);
-    inputClient.println("Accept-Encoding: identity");
-    inputClient.println();
-    String header = inputClient.readStringUntil('\n');
-    guard(header == "HTTP/1.0 200 OK\r", header);
-    while (header != "\r") {
-      header = inputClient.readStringUntil('\n');      
-    }
+    char url[256];
+    inputArg.toCharArray(url, 256);
+    guard(http_get(&inputClient, url), STR_NETWORK_CONNECTION_FAILED);
     input = &inputClient;
   } else {
     String filename = String(CFG_USER_DIRECTORY) + inputArg;
@@ -468,7 +436,6 @@ void cmd_copy(String args) {
   input->setTimeout(1000);
   inputFile.close();
   outputFile.close();
-  if (outputArg != "stdout") writeln(STR_FILES_COPY_COMPLETED);
 }
 
 void cmd_xmodem_recv(String args) {
