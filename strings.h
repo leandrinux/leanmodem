@@ -4,7 +4,7 @@
 #define STR_NO "No"
 #define STR_WAIT "Wait"
 #define STR_USER_INPUT_YES "y"
-#define STR_USER_INPUT_NO "y"
+#define STR_USER_INPUT_NO "n"
 
 #define STR_SYSTEM_PROMPT "> "
 #define STR_SYSTEM_PRE "\r\nleanmodem is starting up"

@@ -125,7 +125,7 @@ String readln() {
   while ((ch != '\n') && (ch != '\r') && (i < 255)) {
     if (!Serial.available()) continue;
     Serial.readBytes(&ch, 1);
-    if ((ch == '\n') && (ch == '\r')) continue;
+    if ((ch == '\n') || (ch == '\r')) continue;
     if ((ch == KEY_BACKSPACE)) {
       buffer[i] = '\0';
       if (i) i--;
