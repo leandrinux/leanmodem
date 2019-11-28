@@ -1,10 +1,13 @@
+#ifndef strings_h
+#define strings_h
+
 // STRINGS ---------------------------------------------------------------------
 #define STR_OK "Ok"
 #define STR_YES "Yes"
 #define STR_NO "No"
 #define STR_WAIT "Wait"
-#define STR_USER_INPUT_YES "y"
-#define STR_USER_INPUT_NO "n"
+#define STR_USER_INPUT_YES "yes"
+#define STR_USER_INPUT_NO "no"
 
 #define STR_SYSTEM_PROMPT "> "
 #define STR_SYSTEM_PRE "\r\nleanmodem is starting up"
@@ -50,7 +53,7 @@
 #define STR_ERROR_INVALID_ARGUMENTS "Invalid arguments"
 #define STR_ERROR_UNKNOWN "Unknown error"
 
-#define STR_FORMAT_PROMPT "THIS WILL ERASE ALL FILES! Continue? (y/n): "
+#define STR_FORMAT_PROMPT "THIS WILL ERASE ALL FILES! Continue? (yes/no): "
 #define STR_FORMAT_OK "Format complete"
 #define STR_FORMAT_FAILED "Format error"
 #define STR_FORMAT_CANCELED "Format cancelled"
@@ -84,3 +87,5 @@
 #define STR_CALENDAR_MONTH_OCT "Oct"
 #define STR_CALENDAR_MONTH_NOV "Nov"
 #define STR_CALENDAR_MONTH_DEC "Dec"
+
+#endif

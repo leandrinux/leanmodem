@@ -19,6 +19,7 @@
 #include "pong.h"
 #include "ansi.h"
 #include "ping.h"
+#include "xmodem.h"
 
 // TYPE DEFINITIONS ------------------------------------------------------------
 typedef void (*CommandHandler)(String args);
@@ -28,19 +29,6 @@ typedef struct {
   CommandHandler handler;
   char detail[60];
 }  CommandEntry;
-
-typedef struct {
-  char ssid[31];
-  char pass[31];
-  char id[11];
-  short int timezone;
-  short int timeout;
-  bool unix_eol;
-  bool sound;
-  bool ansi;
-  bool echo;
-  bool autoconnect;
-} Config;
 
 // xmodem-crc packet
 typedef struct {
@@ -73,7 +61,7 @@ void cmd_ping(String args);
 void cmd_ver(String args);
 
 // CONSTANTS -------------------------------------------------------------------
-const CommandEntry COMMAND_ENTRIES[] = {
+const CommandEntry CommandEntries[] = {
   { "clear", cmd_clear, "clears the screen" },
   { "config", cmd_config, "manages device settings like ssid, pass, and others"},
   { "connect", cmd_connect, "connects device to wifi network" },
@@ -96,8 +84,6 @@ const CommandEntry COMMAND_ENTRIES[] = {
 };
 
 // GLOBAL VARIABLES ------------------------------------------------------------
-Config config = { "", "", "default", 0, 3000, false, true, true, true, true };
-
 bool isConnected = false;
 
 // FUNCTION IMPLEMENTATIONS ----------------------------------------------------
@@ -170,17 +156,13 @@ String sanitize(String input) {
   }
 }
 
-void config_changed(const char propertyName[12]) {
-  sound_setMute(!config.sound);
-}
-
 // COMMAND HANDLERS ------------------------------------------------------------
 
 void cmd_help(String args) {
   writeln("Valid commands are: ");
-  int count = sizeof(COMMAND_ENTRIES)/sizeof(CommandEntry);
+  int count = sizeof(CommandEntries)/sizeof(CommandEntry);
   for (int i=0; i<count; i++) {
-    CommandEntry *entry = (CommandEntry *)&COMMAND_ENTRIES[i];
+    CommandEntry *entry = (CommandEntry *)&CommandEntries[i];
     Serial.printf("%10s   %s\r\n", entry->command.c_str(), entry->detail);
   }
 }
@@ -215,105 +197,26 @@ void cmd_scan(String args) {
   WiFi.scanDelete();
 }
 
-void cmd_config(String args) {
-  
+void cmd_config(String args) {  
   if (args == STR_CONFIG_ARG_SAVE) {
-    File file = SPIFFS.open(CFG_CONFIG_FILENAME, "w");
-    file.write((byte *)&config, sizeof(config));
-    file.close();
+    config_save();
     return;
   }
-  
   if (args == STR_CONFIG_ARG_LOAD) {
-    if (!SPIFFS.exists(CFG_CONFIG_FILENAME)) return;
-    File file = SPIFFS.open(CFG_CONFIG_FILENAME, "r");
-    file.read((byte *)&config, sizeof(config));
-    file.close();
-    config_changed(NULL);
+    config_load();
+    didConfigChange(NULL);    
     return;
   }
-
-  int i = args.indexOf(' ');
-  if (i != -1) {
-    String command = args.substring(0, i);
-    if (command == "set") {
-      String temp = args.substring(i+1);
-      i = temp.indexOf(' ');
-      String propertyName = (i<0) ? temp : temp.substring(0, i);
-      String propertyValue = (i<0) ? "" : temp.substring(i+1);
-      enum FieldType { string = 0, number = 1, boolean = 2 };
-      const int q = 10;
-      const struct {
-        char propertyName[12];
-        void *pointer;
-        FieldType fieldType;
-      } SETTINGS[q] = {
-        { "id", &config.id, string },
-        { "ssid", &config.ssid, string },
-        { "pass", &config.pass, string },
-        { "sound", &config.sound, boolean },
-        { "ansi", &config.ansi, boolean },
-        { "echo", &config.echo, boolean },
-        { "autoconnect", &config.autoconnect, boolean },
-        { "unix", &config.unix_eol, boolean },
-        { "timezone", &config.timezone, number },
-        { "timeout", &config.timeout, number }
-      };
-      int j = 0;
-      while ((j < q) && (String(SETTINGS[j].propertyName) != propertyName)) { j++; };
-      if (j < q) {
-        switch (SETTINGS[j].fieldType) {
-          case string:
-            propertyValue.toCharArray((char *)SETTINGS[j].pointer, 30);
-            config_changed(SETTINGS[j].propertyName);
-            return;
-          case number:
-            *(short int *)SETTINGS[j].pointer = propertyValue.toInt();
-            config_changed(SETTINGS[j].propertyName);
-            return;
-          case boolean:
-            if (propertyValue == "on") {
-              *(char *)SETTINGS[j].pointer = true;
-              config_changed(SETTINGS[j].propertyName);
-              return;
-            }
-            if (propertyValue == "off") {
-              *(char *)SETTINGS[j].pointer = false;
-              config_changed(SETTINGS[j].propertyName);
-              return;
-            }
-            break;
-        }
-      }
-    }
-  }
-  
   if (args == "") {
-    #define CFG_STRING(val) ((*val) ? "'" + String(val) + "'" : String(STR_CONFIG_NOT_SET) )
-    #define CFG_BOOL(val) String(val ? STR_YES : STR_NO)
-    String uptime = String(millis()/1000) + " secs";    
-    writeln("SYSTEM INFO");
-    writeln("  Device ID  : " + CFG_STRING(config.id));
-    writeln("  Timezone   : " + String(config.timezone));
-    writeln("  Uptime     : " + String(uptime));
-    writeln("  Build Date : " + String(__TIMESTAMP__));
-    writeln();
-    writeln("NETWORK INFO");
-    writeln("  SSID     : " + CFG_STRING(config.ssid));
-    writeln("  Password : " + CFG_STRING(config.pass));
-    writeln("  WiFi     : " + CFG_BOOL(isConnected));
-    writeln("  Timeout  : " + String(config.timeout));
-    writeln();
-    writeln("SYSTEM FLAGS");
-    writeln("  Sound       : " + CFG_BOOL(config.sound));
-    writeln("  ANSI Codes  : " + CFG_BOOL(config.ansi));  
-    writeln("  User Echo   : " + CFG_BOOL(config.echo));
-    writeln("  Autoconnect : " + CFG_BOOL(config.autoconnect));
-    writeln("  Unix EOL    : " + CFG_BOOL(config.unix_eol));
-    writeln();
+    config_info(&Serial);
     return;
   }
+  if (config_set(args, &didConfigChange)) return;
   writeln(STR_ERROR_INVALID_ARGUMENTS);
+}
+
+void didConfigChange(const char propertyName[12]) {
+  sound_setMute(!config.sound);
 }
 
 void cmd_telnet(String args) {
@@ -467,39 +370,11 @@ void cmd_copy(String args) {
 }
 
 void cmd_xmodem_recv(String args) {
-    
-  // send C's until there's a response
-  // until not eot 
-  //  receive packet
-  //  respond with ack
-  // transfer complete
-
-  Serial.setTimeout(3000);
-  while (!Serial.available()) {
-    sound(SND_BEEP);
-    Serial.print((char)XMODEM_C);
-    delay(1000);
-  }
-  byte code = 0;
-  byte error_count = 0;
-  XmodemPacket packet;
-  while ( (error_count < 5) && (code != XMODEM_EOT)) {
-    size_t count = Serial.readBytes((char *)&packet, sizeof(packet));
-    tone(CFG_BUZZER_PIN, 1500, 50); delay(50);
-    if (count == sizeof(packet)) {
-      code = packet.start_of_header;
-      Serial.write(XMODEM_ACK);
-      sound(SND_GOOD);
-    } else {
-      sound(SND_ERROR);
-      error_count++;
-    }
-  }
-  Serial.setTimeout(1000);
+  xmodem_recv(&Serial, (const char*)args.c_str());
 }
 
 void cmd_xmodem_send(String args) {
-  
+  xmodem_send(&Serial, (const char*)args.c_str());  
 }
 
 void cmd_time(String args) {
@@ -607,9 +482,9 @@ void cmd_ver(String args) {
 
 CommandHandler findCommand(String cmd) {
   int i = 0;
-  int count = sizeof(COMMAND_ENTRIES)/sizeof(CommandEntry);
-  while ((i<count) && (!cmd.equals(COMMAND_ENTRIES[i].command))) { i++; }
-  return (i<count) ? COMMAND_ENTRIES[i].handler : NULL;
+  int count = sizeof(CommandEntries)/sizeof(CommandEntry);
+  while ((i<count) && (!cmd.equals(CommandEntries[i].command))) { i++; }
+  return (i<count) ? CommandEntries[i].handler : NULL;
 }
 
 void parseCommand(String userInput) {

@@ -1,3 +1,6 @@
+#ifndef other_h
+#define other_h
+
 #define XMODEM_SOH 0x01 // start of header
 #define XMODEM_EOT 0x04 // end of transmission
 #define XMODEM_ACK 0x06 // acknowledge
@@ -10,3 +13,5 @@
 
 #define guard(c,str) if(!(c)){writeln(str);return;}
 #define ntohl(n) ((((n&0xFF))<< 24)|(((n&0xFF00))<<8)|(((n&0xFF0000))>>8)|(((n&0xFF000000))>>24))
+
+#endif
