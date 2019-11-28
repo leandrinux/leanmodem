@@ -10,3 +10,4 @@
 #define CFG_XMODEM_TIMEOUT 2000
 #define CFG_NTP_SERVER "pool.ntp.org"
 #define CFG_COPY_BUFFER_SIZE 1024
+#define CFG_ACTIVITY_LED_PIN 2

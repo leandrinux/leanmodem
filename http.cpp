@@ -10,7 +10,7 @@ unsigned short int default_port(const char scheme[6]) {
 bool split_url(UrlComponents *components, const char *url) {
   char *a, *b;
   memset(components, 0, sizeof(UrlComponents));
-  unsigned int len = strlen(url);
+  if (strlen(url) > 150) return false;
   a = strchr(url, ':'); // look for the : right before http:// or ftp://
   if (!a) return false;
   strncpy(components->scheme, url, a - url);
