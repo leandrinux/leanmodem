@@ -10,10 +10,6 @@
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <SHA256.h>
-#include <Pinger.h>
-extern "C" {
-  #include <lwip/icmp.h> // needed for icmp packet definitions
-}
 
 #include "strings.h"
 #include "config.h"
@@ -22,6 +18,7 @@ extern "C" {
 #include "http.h"
 #include "pong.h"
 #include "ansi.h"
+#include "ping.h"
 
 // TYPE DEFINITIONS ------------------------------------------------------------
 typedef void (*CommandHandler)(String args);
@@ -73,6 +70,7 @@ void cmd_sha256(String args);
 void cmd_pong(String args);
 void cmd_clear(String args);
 void cmd_ping(String args);
+void cmd_ver(String args);
 
 // CONSTANTS -------------------------------------------------------------------
 const CommandEntry COMMAND_ENTRIES[] = {
@@ -92,6 +90,7 @@ const CommandEntry COMMAND_ENTRIES[] = {
   { "sha256", cmd_sha256, "calculates the sha256 hash of a user file" },
   { "telnet", cmd_telnet, "connects to telnet hosts"},
   { "time", cmd_time, "queries an ntp server and displays current time" },
+  { "ver", cmd_ver, "returns the build version and about info" },
   { "xrecv", cmd_xmodem_recv, "receives binary files using the xmodem-crc protocol" },
   { "xsend", cmd_xmodem_send, "sends a binary file using the xmodem-crc protocol" }
 };
@@ -598,65 +597,12 @@ void cmd_clear(String args) {
 void cmd_ping(String args) {
   guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   guard(isConnected, STR_NETWORK_UNAVAILABLE);
-  Pinger pinger;
-  pinger.OnReceive([](const PingerResponse& response) {
-    if (response.ReceivedResponse) {
-      Serial.printf(
-        "Reply from %s: bytes=%d time=%lums TTL=%d\r\n",
-        response.DestIPAddress.toString().c_str(),
-        response.EchoMessageSize - sizeof(struct icmp_echo_hdr),
-        response.ResponseTime,
-        response.TimeToLive);
-    } else {
-      Serial.printf("Request timed out.\r\n");
-    }
-    return true;
-  });
-  
-  pinger.OnEnd([](const PingerResponse& response) {
-    float loss = 100;
-    if(response.TotalReceivedResponses > 0) {
-      loss = (response.TotalSentRequests - response.TotalReceivedResponses) * 100 / response.TotalSentRequests;
-    }
-    Serial.printf(
-      "Ping statistics for %s:\r\n",
-      response.DestIPAddress.toString().c_str());
-    Serial.printf(
-      "    Packets: Sent = %lu, Received = %lu, Lost = %lu (%.2f%% loss),\r\n",
-      response.TotalSentRequests,
-      response.TotalReceivedResponses,
-      response.TotalSentRequests - response.TotalReceivedResponses,
-      loss);
-    if(response.TotalReceivedResponses > 0) {
-      Serial.printf("Approximate round trip times in milli-seconds:\r\n");
-      Serial.printf(
-        "    Minimum = %lums, Maximum = %lums, Average = %.2fms\r\n",
-        response.MinResponseTime,
-        response.MaxResponseTime,
-        response.AvgResponseTime);
-    }
-    Serial.printf("Destination host data:\r\n");
-    Serial.printf(
-      "    IP address: %s\r\n",
-      response.DestIPAddress.toString().c_str());
-    if(response.DestMacAddress != nullptr) {
-      Serial.printf(
-        "    MAC address: " MACSTR "\r\n",
-        MAC2STR(response.DestMacAddress->addr));
-    }
-    if(response.DestHostname != "") {
-      Serial.printf(
-        "    DNS name: %s\r\n",
-        response.DestHostname.c_str());
-    }
-    return true;
-  });
-  
-  Serial.printf("Pinging %s\r\n", args.c_str());
-  if(pinger.Ping(args) == false) {
-    Serial.println("Error during last ping command.\r\n");
-  }
-  delay(10000);
+  ping(&Serial, (char *)args.c_str()); 
+}
+
+void cmd_ver(String args) {
+  writeln(STR_SYSTEM_ABOUT);
+  writeln(STR_SYSTEM_BUILD);
 }
 
 CommandHandler findCommand(String cmd) {
