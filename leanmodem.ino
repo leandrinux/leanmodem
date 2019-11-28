@@ -16,6 +16,8 @@
 #include "other.h"
 #include "sound.h"
 #include "http.h"
+#include "pong.h"
+#include "ansi.h"
 
 // TYPE DEFINITIONS ------------------------------------------------------------
 typedef void (*CommandHandler)(String args);
@@ -63,9 +65,11 @@ void cmd_time(String args);
 void cmd_erase(String args);
 void cmd_hexdump(String args);
 void cmd_sha256(String args);
+void cmd_pong(String args);
+void cmd_clear(String args);
 
 // CONSTANTS -------------------------------------------------------------------
-const int COMMAND_COUNT = 15;
+const int COMMAND_COUNT = 17;
 const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
   { "help", cmd_help },
   { "connect", cmd_connect },
@@ -81,7 +85,9 @@ const CommandEntry COMMAND_ENTRIES[COMMAND_COUNT] = {
   { "time", cmd_time },
   { "erase", cmd_erase },
   { "hexdump", cmd_hexdump },
-  { "sha256", cmd_sha256 }
+  { "sha256", cmd_sha256 },
+  { "pong", cmd_pong },
+  { "clear", cmd_clear }
 };
 
 // GLOBAL VARIABLES ------------------------------------------------------------
@@ -104,23 +110,30 @@ int read() {
 }
 
 int read(byte *buffer, unsigned int size) {
-  return Serial.readBytes(buffer, size);
+  digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);
+  int i = Serial.readBytes(buffer, size);
+  digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);  
+  return i;
 }
 
-String readln() {
+String readln() { 
+  #define KEY_BACKSPACE 0x7f
   const int BUFFER_SIZE = 256; 
   char buffer[BUFFER_SIZE];
   char ch = '\0';
   byte i = 0;
   while ((ch != '\n') && (ch != '\r') && (i < 255)) {
-    if (Serial.available()) {
-      Serial.readBytes(&ch, 1);
-      if ((ch != '\n') && (ch != '\r')) {
-        buffer[i] = ch;
-        if (config.echo) Serial.print(ch);
-        i++;        
-      }
+    if (!Serial.available()) continue;
+    Serial.readBytes(&ch, 1);
+    if ((ch == '\n') && (ch == '\r')) continue;
+    if ((ch == KEY_BACKSPACE)) {
+      buffer[i] = '\0';
+      if (i) i--;
+    } else {
+      buffer[i] = ch;
+      i++;          
     }
+    if (config.echo && (i>0)) Serial.print(ch);
   }
   buffer[i] = '\0';
   if (config.echo) Serial.print(config.unix_eol ? "\n" : "\r\n");
@@ -432,10 +445,12 @@ void cmd_copy(String args) {
   input->setTimeout(config.timeout);
   size_t count = 1;
   char buffer[CFG_COPY_BUFFER_SIZE];
+  digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);
   while (count > 0) {
     count = input->readBytes(buffer, CFG_COPY_BUFFER_SIZE);
     output->write(buffer, count);
   }
+  digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
   input->setTimeout(1000);
   inputFile.close();
   outputFile.close();
@@ -505,6 +520,7 @@ void cmd_hexdump(String args) {
   int count = file.readBytes(buffer, CFG_HEXDUMP_LENGTH);
   int offset = 0;
   byte val;
+  digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);  
   while (count) {
     sprintf(str, "%08X", offset);
     write(String(str) + ": ");  
@@ -527,6 +543,7 @@ void cmd_hexdump(String args) {
     count = file.readBytes(buffer, sizeof(buffer));
   }
   sprintf(str, "%08X", offset);
+  digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
   writeln(String(str));  
   file.close();
 }
@@ -554,6 +571,17 @@ void cmd_sha256(String args) {
   }
   writeln();
   file.close();
+}
+
+void cmd_pong(String args) {
+  guard(config.ansi, STR_NOT_SUPPORTED);
+  pong_start(&Serial);
+}
+
+void cmd_clear(String args) {
+  guard(config.ansi, STR_NOT_SUPPORTED);
+  ansi_clear();
+  ansi_goto(1, 1);  
 }
 
 CommandHandler findCommand(String cmd) {
@@ -594,6 +622,9 @@ void setup() {
   delay(CFG_STARTUP_DELAY);
   writeln(STR_SYSTEM_PRE);
 
+  pinMode(CFG_ACTIVITY_LED_PIN, OUTPUT);
+  digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
+  ansi_set_stream(&Serial);
   sound_setPin(CFG_BUZZER_PIN);
   SPIFFS.begin();
   SPIFFS.gc();
