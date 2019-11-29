@@ -11,7 +11,7 @@
 #define XMODEM_BUFFER_SIZE 20
 #define XMODEM_MAX_RETRIES 6
 
-#define guard(c,str) if(!(c)){writeln(str);return;}
+#define guard(c,str) if(!(c)){stream->println(str);return;}
 #define ntohl(n) ((((n&0xFF))<< 24)|(((n&0xFF00))<<8)|(((n&0xFF0000))>>8)|(((n&0xFF000000))>>24))
 
 #endif

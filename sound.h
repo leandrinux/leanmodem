@@ -1,7 +1,7 @@
 #ifndef sound_h
 #define sound_h
 
-#define guards(c,str,snd) if(!(c)){writeln(str);sound(snd);return;}
+#define guards(c,str,snd) if(!(c)){stream->println(str);sound(snd);return;}
 
 enum SoundCode {
   SND_BEEP = 1,

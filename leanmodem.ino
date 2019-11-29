@@ -30,15 +30,6 @@ typedef struct {
   char detail[60];
 }  CommandEntry;
 
-// xmodem-crc packet
-typedef struct {
-  byte start_of_header;
-  byte packet_number;
-  byte packet_number_chk;
-  byte data[128];
-  word crc;
-}  __attribute__((packed)) XmodemPacket;
-
 // FUNCTION DECLARATIONS -------------------------------------------------------
 void cmd_help(String args);
 void cmd_connect(String args);
@@ -85,27 +76,9 @@ const CommandEntry CommandEntries[] = {
 
 // GLOBAL VARIABLES ------------------------------------------------------------
 bool isConnected = false;
+Stream *stream = &Serial; 
 
 // FUNCTION IMPLEMENTATIONS ----------------------------------------------------
-
-void setTimeout(long time){
-  Serial.setTimeout(time);
-}
-
-int available() {
-  return Serial.available();
-}
-
-int read() {
-  return Serial.read();
-}
-
-int read(byte *buffer, unsigned int size) {
-  digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);
-  int i = Serial.readBytes(buffer, size);
-  digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);  
-  return i;
-}
 
 String readln() { 
   #define KEY_BACKSPACE 0x7f
@@ -114,8 +87,8 @@ String readln() {
   char ch = '\0';
   byte i = 0;
   while ((ch != '\n') && (ch != '\r') && (i < 255)) {
-    if (!Serial.available()) continue;
-    Serial.readBytes(&ch, 1);
+    if (!stream->available()) continue;
+    stream->readBytes(&ch, 1);
     if ((ch == '\n') || (ch == '\r')) continue;
     if ((ch == KEY_BACKSPACE)) {
       buffer[i] = '\0';
@@ -127,39 +100,14 @@ String readln() {
     if (config.echo && (i>0)) Serial.print(ch);
   }
   buffer[i] = '\0';
-  if (config.echo) Serial.print(config.unix_eol ? "\n" : "\r\n");
+  if (config.echo) stream->print(config.unix_eol ? "\n" : "\r\n");
   return String(buffer);
-}
-
-void write(String s) {
-  Serial.print(s);
-}
- 
-void write(byte *buffer, unsigned int size) {
-  Serial.write(buffer, size);
-}
-
-void writeln() {
-  Serial.print(config.unix_eol ? "\n" : "\r\n");  
-}
-
-void writeln(String s) {
-  Serial.print(s);
-  Serial.print(config.unix_eol ? "\n" : "\r\n");
-}
-
-String sanitize(String input) {
-  if (config.ansi) {
-    return input;
-  } else {
-    return input;   
-  }
 }
 
 // COMMAND HANDLERS ------------------------------------------------------------
 
 void cmd_help(String args) {
-  writeln("Valid commands are: ");
+  stream->println("Valid commands are: ");
   int count = sizeof(CommandEntries)/sizeof(CommandEntry);
   for (int i=0; i<count; i++) {
     CommandEntry *entry = (CommandEntry *)&CommandEntries[i];
@@ -178,7 +126,7 @@ void cmd_connect(String args) {
       String msg = String(STR_NETWORK_CONNECTED_TO);
       msg.replace("%s1", config.ssid);
       msg.replace("%s2", WiFi.localIP().toString());
-      writeln(msg);
+      stream->println(msg);
       isConnected = true;
       break;
     }
@@ -188,11 +136,11 @@ void cmd_connect(String args) {
 }
 
 void cmd_scan(String args) {
-  writeln(STR_NETWORK_SCANNING);
+  stream->println(STR_NETWORK_SCANNING);
   int count = WiFi.scanNetworks();
-  writeln(STR_NETWORK_FOUND + String(count));
+  stream->println(STR_NETWORK_FOUND + String(count));
   for (int i = 0; i < count; i++) {
-    writeln("   '" + String(WiFi.SSID(i).c_str()) + "', Ch:" + String(WiFi.channel(i)) + ", rssi:" + String(WiFi.RSSI(i)));
+    stream->println("   '" + String(WiFi.SSID(i).c_str()) + "', Ch:" + String(WiFi.channel(i)) + ", rssi:" + String(WiFi.RSSI(i)));
   }
   WiFi.scanDelete();
 }
@@ -212,7 +160,7 @@ void cmd_config(String args) {
     return;
   }
   if (config_set(args, &didConfigChange)) return;
-  writeln(STR_ERROR_INVALID_ARGUMENTS);
+  stream->println(STR_ERROR_INVALID_ARGUMENTS);
 }
 
 void didConfigChange(const char propertyName[12]) {
@@ -239,23 +187,23 @@ void cmd_telnet(String args) {
   while ((key != CFG_TELNET_BREAK_KEYCODE) && (client.connected() || client.available())) {      
     if (client.available()) {
       count = client.readBytes(buffer, CFG_TELNET_BUFFER_SIZE);
-      write(buffer, count);        
+      stream->write(buffer, count);        
     }
-    if (available()) {
-      count = read(buffer, CFG_TELNET_BUFFER_SIZE);
+    if (stream->available()) {
+      count = stream->readBytes(buffer, CFG_TELNET_BUFFER_SIZE);
       client.write(buffer, count);
       key = (count > 0) ? int(buffer[0]) : -1; 
     }
   }
   client.stop();
   delay(1);
-  writeln();
-  writeln(STR_NETWORK_DISCONNECTED);
+  stream->println();
+  stream->println(STR_NETWORK_DISCONNECTED);
   sound(SND_BEEP);
 }
 
 void cmd_restart(String args) {
-  writeln(STR_SYSTEM_WILL_RESTART);
+  stream->println(STR_SYSTEM_WILL_RESTART);
   delay(500);
   ESP.restart();
 }
@@ -263,10 +211,10 @@ void cmd_restart(String args) {
 void cmd_files(String args) {
   String directory;
   if (args == STR_FILES_ARG_SYSTEM) {
-    writeln(STR_FILES_SYSTEM_TITLE);
+    stream->println(STR_FILES_SYSTEM_TITLE);
     directory = CFG_SYSTEM_DIRECTORY;
   } else {
-    writeln(STR_FILES_USER_TITLE);
+    stream->println(STR_FILES_USER_TITLE);
     directory = CFG_USER_DIRECTORY;    
   }
   Dir dir = SPIFFS.openDir(directory);
@@ -278,31 +226,31 @@ void cmd_files(String args) {
     filename = dir.fileName().substring(directory.length());
     msg.replace("%s", filename);
     msg.replace("%d", String(dir.fileSize()));
-    writeln(msg);
+    stream->println(msg);
   }
-  if (empty) writeln(STR_FILES_EMPTY);
-  writeln();
+  if (empty) stream->println(STR_FILES_EMPTY);
+  stream->println();
   FSInfo fs_info;
   SPIFFS.info(fs_info);
   msg = String(STR_FILES_TOTAL_BYTES);
   msg.replace("%d", String(fs_info.totalBytes));
-  writeln(msg);
+  stream->println(msg);
   msg = String(STR_FILES_USED_BYTES);
   msg.replace("%d", String(fs_info.usedBytes));
-  writeln(msg);
+  stream->println(msg);
   msg = String(STR_FILES_FREE_BYTES);
   msg.replace("%d", String(fs_info.totalBytes - fs_info.usedBytes));
-  writeln(msg);    
+  stream->println(msg);    
 }
 
 void cmd_format(String args) {
   sound(SND_ALERT);
-  write(STR_FORMAT_PROMPT);
+  stream->print(STR_FORMAT_PROMPT);
   String userInput = readln();
   guard(userInput == STR_USER_INPUT_YES, STR_FORMAT_CANCELED);
-  writeln(STR_WAIT);
+  stream->println(STR_WAIT);
   bool success = SPIFFS.format();
-  writeln(success ? STR_FORMAT_OK : STR_FORMAT_FAILED);
+  stream->println(success ? STR_FORMAT_OK : STR_FORMAT_FAILED);
   SPIFFS.end();
   cmd_restart("");
 }
@@ -312,14 +260,14 @@ void cmd_copy(String args) {
   int i = args.indexOf(' ');
   guard(i != -1, STR_ERROR_INVALID_ARGUMENTS);
   String inputArg = args.substring(0, i);
-  String outputArg = args.substring(i+1);
+  String streamArg = args.substring(i+1);
   Stream *input = NULL;
-  Stream *output = NULL;
+  Stream *stream = NULL;
   File inputFile;
-  File outputFile;
+  File streamFile;
   WiFiClient inputClient;
   guard(inputArg != STR_COPY_STANDARD_OUTPUT, STR_ERROR_INVALID_ARGUMENTS);
-  guard(outputArg != STR_COPY_STANDARD_INPUT, STR_ERROR_INVALID_ARGUMENTS);
+  guard(streamArg != STR_COPY_STANDARD_INPUT, STR_ERROR_INVALID_ARGUMENTS);
   
   if (inputArg == STR_COPY_STANDARD_INPUT) {
     input = &Serial;
@@ -345,28 +293,28 @@ void cmd_copy(String args) {
     if (inputFile) input = &inputFile;
   }
   
-  if (outputArg == STR_COPY_STANDARD_OUTPUT) {
-    output = &Serial;
+  if (streamArg == STR_COPY_STANDARD_OUTPUT) {
+    stream = &Serial;
   } else {
-    String filename = String(CFG_USER_DIRECTORY) + outputArg;
-    outputFile = SPIFFS.open(filename, "w");   
-    if (outputFile) output = &outputFile;
+    String filename = String(CFG_USER_DIRECTORY) + streamArg;
+    streamFile = SPIFFS.open(filename, "w");   
+    if (streamFile) stream = &streamFile;
   }
   
   guard(input != NULL, STR_ERROR_INVALID_ARGUMENTS);
-  guard(output != NULL, STR_ERROR_INVALID_ARGUMENTS);
+  guard(stream != NULL, STR_ERROR_INVALID_ARGUMENTS);
   input->setTimeout(config.timeout);
   size_t count = 1;
   char buffer[CFG_COPY_BUFFER_SIZE];
   digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);
   while (count > 0) {
     count = input->readBytes(buffer, CFG_COPY_BUFFER_SIZE);
-    output->write(buffer, count);
+    stream->write(buffer, count);
   }
   digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
   input->setTimeout(1000);
   inputFile.close();
-  outputFile.close();
+  streamFile.close();
 }
 
 void cmd_xmodem_recv(String args) {
@@ -383,7 +331,7 @@ void cmd_time(String args) {
   NTPClient timeClient(ntpUDP, CFG_NTP_SERVER, config.timezone * 3600);
   timeClient.begin();
   timeClient.update();
-  writeln(timeClient.getFullFormattedTime());
+  stream->println(timeClient.getFullFormattedTime());
   timeClient.end();
 }
 
@@ -391,7 +339,7 @@ void cmd_erase(String args) {
   guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   String filename = CFG_USER_DIRECTORY + args;
   guard(SPIFFS.exists(filename), STR_FILES_NOT_FOUND);
-  writeln(SPIFFS.remove(filename) ? STR_FILES_ERASE_SUCCESS : STR_ERROR_UNKNOWN);
+  stream->println(SPIFFS.remove(filename) ? STR_FILES_ERASE_SUCCESS : STR_ERROR_UNKNOWN);
 }
 
 void cmd_hexdump(String args) {
@@ -408,28 +356,28 @@ void cmd_hexdump(String args) {
   digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);  
   while (count) {
     sprintf(str, "%08X", offset);
-    write(String(str) + ": ");  
+    stream->print(String(str) + ": ");  
     offset += count;
     for (byte i=0;i<count;i++) {
       val = buffer[i];
       sprintf(str, "%02X", val);
-      write(String(str));
-      if ((i+1)%4==0) write(" ");
+      stream->print(str);
+      if ((i+1)%4==0) stream->print(" ");
     }
     val = 36 - (count * 2 + count / 4);
-    while (val>0) { write(" "); val--; }
-    write("|");
+    while (val>0) { stream->print(" "); val--; }
+    stream->print("|");
     for (byte i=0;i<count;i++) {
       val = buffer[i];
-      write(((val>=0x20)&&(val<=0x7e)) ? String((char)val) : ".");
+      stream->print(((val>=0x20)&&(val<=0x7e)) ? String((char)val) : ".");
     }
-    write("|");
-    writeln();
+    stream->print("|");
+    stream->println();
     count = file.readBytes(buffer, sizeof(buffer));
   }
   sprintf(str, "%08X", offset);
   digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
-  writeln(String(str));  
+  stream->println(String(str));  
   file.close();
 }
 
@@ -452,9 +400,9 @@ void cmd_sha256(String args) {
   sha.finalize(hash, size);
   for (int i=0;i<size;i++) {
     sprintf(str, "%02X", hash[i]);
-    write(String(str));
+    stream->print(str);
   }
-  writeln();
+  stream->println();
   file.close();
 }
 
@@ -476,8 +424,8 @@ void cmd_ping(String args) {
 }
 
 void cmd_ver(String args) {
-  writeln(STR_SYSTEM_ABOUT);
-  writeln(STR_SYSTEM_BUILD);
+  stream->println(STR_SYSTEM_ABOUT);
+  stream->println(STR_SYSTEM_BUILD);
 }
 
 CommandHandler findCommand(String cmd) {
@@ -503,19 +451,16 @@ void parseCommand(String userInput) {
   if (handler == NULL) {
     String errorMessage = String(STR_ERROR_COMMAND_UNRECOGNIZED);
     errorMessage.replace("%s", cmd);
-    writeln(errorMessage);
+    stream->println(errorMessage);
     return;
   }
   handler(args);
 }
 
-// INITIALIZATION AND MAIN LOOP ------------------------------------------------
-
-void setup() {
+void boot() {
   Serial.begin(CFG_CONSOLE_BAUD_RATE);
   delay(CFG_STARTUP_DELAY);
-  writeln(STR_SYSTEM_PRE);
-
+  stream->println(STR_SYSTEM_PRE);
   pinMode(CFG_ACTIVITY_LED_PIN, OUTPUT);
   digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
   ansi_set_stream(&Serial);
@@ -524,8 +469,13 @@ void setup() {
   SPIFFS.gc();
   cmd_config(STR_CONFIG_ARG_LOAD);
   if (config.autoconnect && *config.ssid) cmd_connect("");
+  stream->println(STR_SYSTEM_POST);  
+}
 
-  writeln(STR_SYSTEM_POST);
+// INITIALIZATION AND MAIN LOOP ------------------------------------------------
+
+void setup() {
+  boot();
 }
 
 void loop() {
