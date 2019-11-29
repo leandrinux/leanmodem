@@ -41,10 +41,10 @@ leanmodem is using by plugging the nodemcu to your computer using a micro-USB ca
 
 Once you see the command prompt you will be able to use the following commands. Make sure you always use lowercase characters, otherwise your commands won't be recognized.
 
-# clear
+### clear
 Clears the screen. Only works if your Terminal supports ANSI codes and your ANSI flag is set to yes.
 
-# config [nothing/load/save/set]
+### config [nothing/load/save/set]
 Allows you to see the current settings, change, load and save them.
 
 * `config`: displays the device configuration
@@ -62,10 +62,10 @@ Allows you to see the current settings, change, load and save them.
   * **timezone** [Number] sets the current timezone. This will affect how time is displayed by your device.
   * **timeout** [Number] number of milliseconds that the device waits before cutting communication with a remote device. A larger number will make it more resistant to errors but it will make it more unresponsive to the user. A smaller number makes it faster and more responsive, but it could result in communications being cut before it's due (this is a risk with older computers or during user interaction).
 
-# connect
+### connect
 Connects to the wireless network using the SSID and password previously set with `config`.
 
-# copy [source] [target]
+### copy [source] [target]
 This is one of the most powerful commands in leanmodem. It copies information from `[source]` to `[target]`. For instance, it copies user input to a file, or data from a file to another (making a duplicate), or even information from a TCP socket, or data downloaded via HTTP. Check out these examples:
 * `copy stdin somefile`: read information from the user and writes it down to `somefile`. Once you are done typing just wait for it to timeout and it will save and close the output.
 * `copy somefile anotherfile`: creates a new file called `anotherfile` with the contents of `somefile`.
@@ -73,52 +73,52 @@ This is one of the most powerful commands in leanmodem. It copies information fr
 * `copy tcp://192.168.0.1:8080 somefile`: it opens a raw TCP socket to `192.168.0.1` at port `8080` and dumps everything that it receives through it to `somefile`.
 * `copy http://www.example.com/ website`: connects to the provided URL using default port 80, downloads the webpage and dumps it in a local file called `website`. Be aware, only HTTP/1.0 is supported. HTTPS is not supported... yet.
 
-# erase [filename]
+### erase [filename]
 Erases the specified local file
 
-# files [-s]
+### files [-s]
 Displays the files stored in the local filesystem. By default it displays user files, but you can use the `-s` argument to see the system files. System files are usually not accessible by the user by using the terminal alone.
 
-# format
+### format
 Erases all the information in the device, including the system configuration. It restores the device to its "factory" settings.
 
-# help
+### help
 Displays a list of all available commands and a short explanation for each one.
 
-# hexdump [filename]
+### hexdump [filename]
 Displays the contents of the specified file using the classic hex editor style.
 
-# ping [host]
+### ping [host]
 Pings the remote host using the standard ICMP method.
 
-# pong
+### pong
 It allows you to play pong! Yes, you read that correctly. Try it out! You need an ANSI compatible terminal.
 
-# restart
+### restart
 Restarts the device
 
-# scan
+### scan
 Scans for nearby wireless networks
 
-# setpin [pin number] [yes/no]
+### setpin [pin number] [yes/no]
 Sets a GPIO pin to digital output and sets it HIGH or LOW depending on the provided parameter. For the nodemcu the only available pins are 0, 2, 5, 4, 14, 12 and 13. [Check out this website](https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/) for more information about usable digital output pins in the nodemcu.
 
-# sha256 [filename]
+### sha256 [filename]
 Calculates the sha256 hash of the specified local file.
 
-# telnet [host]
+### telnet [host]
 It connects via WiFi to the specified telnet host. This is great for old computers to connect to Internet-based old-style bulletin boards (BBS).
 
-# time
+### time
 It queries the current time using NTP and displays it on the screen using the device's `timezone` setting.
 
-# ver
+### ver
 Returns the about information and the build date.
 
-# xrecv [filename]
+### xrecv [filename]
 It receives a file from the computer using the old standard xmodem-crc protocol. This was tested with old programs like Windows 3.0 Terminal application.
 
-# xsend [filename]
+### xsend [filename]
 Sends the specified local filename to the connected computer using the xmodem-crc binary protocol.
 
 ## Authors
