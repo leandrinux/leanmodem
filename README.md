@@ -35,6 +35,92 @@ You need to have the Arduino IDE installed and properly set up for compiling pro
   * Flash Size: `4M (1M SPIFFS)`
 7. You should be ready to compile and install the project into your nodemcu. Again, let me know if you have issues. That will help me to improve these instructions, if necessary.
 
+## Usage
+
+leanmodem is using by plugging the nodemcu to your computer using a micro-USB cable. Then, you need a terminal emulator such as [PuTTY](https://www.putty.org/) to connect to the proper COM port that was automatically assigned to the nodemcu after you connected it. Make sure that you set the appropriate speed as set in the `CFG_CONSOLE_BAUD_RATE` option in `config.h`. At time of this writing, the speed is 19200 bauds.
+
+Once you see the command prompt you will be able to use the following commands. Make sure you always use lowercase characters, otherwise your commands won't be recognized.
+
+# clear
+Clears the screen. Only works if your Terminal supports ANSI codes and your ANSI flag is set to yes.
+
+# config [nothing/load/save/set]
+Allows you to see the current settings, change, load and save them.
+
+* `config`: displays the device configuration
+* `config load`: loads configuration from system file
+* `config save`: saves configuration to system file
+* `config set [setting] [value]`: Sets [value] to [setting]. `String` means the argument requires values to be text. `Boolean` means the argument has to be `yes` or `no`. `Number` means the argument must be a number between -32768 and 32787. Valid settings are:
+  * **id** [String] the name of your device.
+  * **ssid** [String] the SSID of your wireless network.
+  * **pass** [String] the password for your wireless network. BE AWARE that your WiFi password will be stored in plaintext in your device, and you can even see it among the other configuration values.
+  * **sound** [Boolean] Enables sounds via the pin specified in `CFG_BUZZER_PIN`.
+  * **ansi** [Boolean] Enables leanmodem to use ANSI codes for enhanced terminal output, with colors and more complex interfaces.
+  * **echo** [Boolean] When set to `yes` this setting returns all user input to your terminal, displaying it on the screen.
+  * **autoconnect** [Boolean] when set to `yes` leanmodem will automatically connect to the wireless network during startup.
+  * **unix** [Boolean] when set to `yes`, all line-endings will be LF only (Unix compatible). If set to `no` line-endings will be CRLF (Windows compatible).
+  * **timezone** [Number] sets the current timezone. This will affect how time is displayed by your device.
+  * **timeout** [Number] number of milliseconds that the device waits before cutting communication with a remote device. A larger number will make it more resistant to errors but it will make it more unresponsive to the user. A smaller number makes it faster and more responsive, but it could result in communications being cut before it's due (this is a risk with older computers or during user interaction).
+
+# connect
+Connects to the wireless network using the SSID and password previously set with `config`.
+
+# copy [source] [target]
+This is one of the most powerful commands in leanmodem. It copies information from `[source]` to `[target]`. For instance, it copies user input to a file, or data from a file to another (making a duplicate), or even information from a TCP socket, or data downloaded via HTTP. Check out these examples:
+* `copy stdin somefile`: read information from the user and writes it down to `somefile`. Once you are done typing just wait for it to timeout and it will save and close the output.
+* `copy somefile anotherfile`: creates a new file called `anotherfile` with the contents of `somefile`.
+* `copy somefile stdout`: retrieves the contents of somefile and dumps them to your terminal, displaying it. Be aware that displaying binary files might confuse or crash your terminal.
+* `copy tcp://192.168.0.1:8080 somefile`: it opens a raw TCP socket to `192.168.0.1` at port `8080` and dumps everything that it receives through it to `somefile`.
+* `copy http://www.example.com/ website`: connects to the provided URL using default port 80, downloads the webpage and dumps it in a local file called `website`. Be aware, only HTTP/1.0 is supported. HTTPS is not supported... yet.
+
+# erase [filename]
+Erases the specified local file
+
+# files [-s]
+Displays the files stored in the local filesystem. By default it displays user files, but you can use the `-s` argument to see the system files. System files are usually not accessible by the user by using the terminal alone.
+
+# format
+Erases all the information in the device, including the system configuration. It restores the device to its "factory" settings.
+
+# help
+Displays a list of all available commands and a short explanation for each one.
+
+# hexdump [filename]
+Displays the contents of the specified file using the classic hex editor style.
+
+# ping [host]
+Pings the remote host using the standard ICMP method.
+
+# pong
+It allows you to play pong! Yes, you read that correctly. Try it out! You need an ANSI compatible terminal.
+
+# restart
+Restarts the device
+
+# scan
+Scans for nearby wireless networks
+
+# setpin [pin number] [yes/no]
+Sets a GPIO pin to digital output and sets it HIGH or LOW depending on the provided parameter. For the nodemcu the only available pins are 0, 2, 5, 4, 14, 12 and 13. [Check out this website](https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/) for more information about usable digital output pins in the nodemcu.
+
+# sha256 [filename]
+Calculates the sha256 hash of the specified local file.
+
+# telnet [host]
+It connects via WiFi to the specified telnet host. This is great for old computers to connect to Internet-based old-style bulletin boards (BBS).
+
+# time
+It queries the current time using NTP and displays it on the screen using the device's `timezone` setting.
+
+# ver
+Returns the about information and the build date.
+
+# xrecv [filename]
+It receives a file from the computer using the old standard xmodem-crc protocol. This was tested with old programs like Windows 3.0 Terminal application.
+
+# xsend [filename]
+Sends the specified local filename to the connected computer using the xmodem-crc binary protocol.
+
 ## Authors
 
 * **Leandro Tami** - [reach me on Twitter by my handle @leandrinux](https://twitter.com/leandrinux)
