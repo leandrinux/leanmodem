@@ -8,11 +8,13 @@
 #define CFG_BOOL(val) ((val) ? STR_YES : STR_NO)
 
 Config config = { "", "", "default", 0, 3000, false, true, true, true, true };
+bool isConfigNotSaved = false;
 
 void config_save() {
   File file = SPIFFS.open(CFG_CONFIG_FILENAME, "w");
   file.write((byte *)&config, sizeof(config));
-  file.close();  
+  file.close();
+  isConfigNotSaved = false;
 }
 
 void config_load() {
@@ -47,7 +49,10 @@ void config_info(Stream *stream) {
   stream_printf(stream, "  ANSI Codes  : %s\r\n", CFG_BOOL(config.ansi));  
   stream_printf(stream, "  User Echo   : %s\r\n", CFG_BOOL(config.echo));
   stream_printf(stream, "  Autoconnect : %s\r\n", CFG_BOOL(config.autoconnect));
-  stream_printf(stream, "\r\n"); 
+  stream_printf(stream, "\r\n");
+  if (isConfigNotSaved) {
+    stream->println("\r\nYou made configuration changes, use 'config save' to make them permanent.");
+  }
 }
 
 bool config_set(String args, DidConfigChangeHandler didConfigChange) {
@@ -84,23 +89,19 @@ bool config_set(String args, DidConfigChangeHandler didConfigChange) {
           case string:
             propertyValue.toCharArray((char *)SETTINGS[j].pointer, 30);
             if (didConfigChange) didConfigChange(SETTINGS[j].propertyName);
+            isConfigNotSaved = true;
             return true;
           case number:
             *(short int *)SETTINGS[j].pointer = propertyValue.toInt();
             if (didConfigChange) didConfigChange(SETTINGS[j].propertyName);
+            isConfigNotSaved = true;
             return true;
           case boolean:
-            if (propertyValue == STR_USER_INPUT_YES) {
-              *(char *)SETTINGS[j].pointer = true;
-              if (didConfigChange) didConfigChange(SETTINGS[j].propertyName);
-              return true;
-            }
-            if (propertyValue == STR_USER_INPUT_NO) {
-              *(char *)SETTINGS[j].pointer = false;
-              if (didConfigChange) didConfigChange(SETTINGS[j].propertyName);
-              return true;
-            }
-            break;
+            if ( (propertyValue != STR_USER_INPUT_YES) && (propertyValue != STR_USER_INPUT_NO)) break;
+            *(char *)SETTINGS[j].pointer = propertyValue == STR_USER_INPUT_YES;
+            if (didConfigChange) didConfigChange(SETTINGS[j].propertyName);
+            isConfigNotSaved = true;
+            return true;
         }
       }
     }

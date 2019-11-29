@@ -431,7 +431,7 @@ void cmd_ver(String args) {
 }
 
 void cmd_setpin(String args) {
-  const byte valid_pins[] = { 5, 4, 0, 2, 14, 12, 13 };
+  const byte valid_pins[] = { 0, 2, 5, 4, 14, 12, 13 };
   guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   int i = args.indexOf(' ');
   guard(i != -1, STR_ERROR_INVALID_ARGUMENTS);
