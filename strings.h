@@ -58,6 +58,8 @@
 #define STR_FORMAT_FAILED "Format error"
 #define STR_FORMAT_CANCELED "Format cancelled"
 
+#define STR_SET_PIN_OK "Pin %d set to %s"
+#define STR_SET_PIN_NOT_ALLOWED "Pin is not valid as output in the nodemcu"
 #define STR_CALENDAR_DAY_MONDAY "Monday"
 #define STR_CALENDAR_DAY_TUESDAY "Tuesday"
 #define STR_CALENDAR_DAY_WEDNESDAY "Wednesday"

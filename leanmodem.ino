@@ -50,6 +50,7 @@ void cmd_pong(String args);
 void cmd_clear(String args);
 void cmd_ping(String args);
 void cmd_ver(String args);
+void cmd_setpin(String args);
 
 // CONSTANTS -------------------------------------------------------------------
 const CommandEntry CommandEntries[] = {
@@ -66,6 +67,7 @@ const CommandEntry CommandEntries[] = {
   { "pong", cmd_pong, "plays a game of pong" },
   { "restart", cmd_restart, "restarts the device" },
   { "scan", cmd_scan, "scans for wireless networks" },
+  { "setpin", cmd_setpin, "turns on/off a digital pin on the device" },
   { "sha256", cmd_sha256, "calculates the sha256 hash of a user file" },
   { "telnet", cmd_telnet, "connects to telnet hosts"},
   { "time", cmd_time, "queries an ntp server and displays current time" },
@@ -426,6 +428,24 @@ void cmd_ping(String args) {
 void cmd_ver(String args) {
   stream->println(STR_SYSTEM_ABOUT);
   stream->println(STR_SYSTEM_BUILD);
+}
+
+void cmd_setpin(String args) {
+  const byte valid_pins[] = { 5, 4, 0, 2, 14, 12, 13 };
+  guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
+  int i = args.indexOf(' ');
+  guard(i != -1, STR_ERROR_INVALID_ARGUMENTS);
+  byte pin_number = args.substring(0, i).toInt();
+  guard(i > 0, STR_ERROR_INVALID_ARGUMENTS);
+  String setting = args.substring(i+1);
+  guard((setting == STR_USER_INPUT_YES) || (setting == STR_USER_INPUT_NO), STR_ERROR_INVALID_ARGUMENTS);
+  for (byte i=0; (i<sizeof(valid_pins)) && (valid_pins[i] != pin_number); i++);
+  guard(i < sizeof(valid_pins), STR_SET_PIN_NOT_ALLOWED);
+  pinMode(pin_number, OUTPUT);
+  digitalWrite(pin_number, (setting == STR_USER_INPUT_YES) ? HIGH : LOW);
+  char msg[21];
+  sprintf(msg, STR_SET_PIN_OK, pin_number, setting.c_str());
+  stream->println(msg);
 }
 
 CommandHandler findCommand(String cmd) {
