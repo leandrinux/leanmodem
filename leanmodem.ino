@@ -261,62 +261,61 @@ void cmd_copy(String args) {
   guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   int i = args.indexOf(' ');
   guard(i != -1, STR_ERROR_INVALID_ARGUMENTS);
-  String inputArg = args.substring(0, i);
-  String streamArg = args.substring(i+1);
-  Stream *input = NULL;
-  Stream *stream = NULL;
-  File inputFile;
-  File streamFile;
-  WiFiClient inputClient;
-  guard(inputArg != STR_COPY_STANDARD_OUTPUT, STR_ERROR_INVALID_ARGUMENTS);
-  guard(streamArg != STR_COPY_STANDARD_INPUT, STR_ERROR_INVALID_ARGUMENTS);
-  
-  if (inputArg == STR_COPY_STANDARD_INPUT) {
-    input = &Serial;
-  } else if (inputArg.startsWith(STR_COPY_TCP_PREFIX)) {
+  String sourceArg = args.substring(0, i);
+  String targetArg = args.substring(i+1);
+  Stream *source = NULL;
+  Stream *target = NULL;
+  File sourceFile;
+  File targetFile;
+  WiFiClient sourceClient;
+  guard(sourceArg != STR_COPY_STANDARD_OUTPUT, STR_ERROR_INVALID_ARGUMENTS);
+  guard(targetArg != STR_COPY_STANDARD_INPUT, STR_ERROR_INVALID_ARGUMENTS);
+  if (sourceArg == STR_COPY_STANDARD_INPUT) {
+    source = stream;
+  } else if (sourceArg.startsWith(STR_COPY_TCP_PREFIX)) {
     guard(isConnected, STR_NETWORK_UNAVAILABLE);
-    String uri = inputArg.substring(String(STR_COPY_TCP_PREFIX).length());
+    String uri = sourceArg.substring(String(STR_COPY_TCP_PREFIX).length());
     int i = uri.indexOf(':');
     guard(i >= 0, STR_COPY_PORT_MISSING);
     String host = uri.substring(0, i);
     int port = uri.substring(i+1).toInt();
-    guard(inputClient.connect(host, port), STR_NETWORK_HOST_UNAVAILABLE);
-    input = &inputClient;
-  } else if (inputArg.startsWith(STR_COPY_HTTP_PREFIX)) {
+    guard(sourceClient.connect(host, port), STR_NETWORK_HOST_UNAVAILABLE);
+    source = &sourceClient;
+  } else if (sourceArg.startsWith(STR_COPY_HTTP_PREFIX)) {
     guard(isConnected, STR_NETWORK_UNAVAILABLE);
     char url[256];
-    inputArg.toCharArray(url, 256);
-    guard(http_get(&inputClient, url), STR_NETWORK_CONNECTION_FAILED);
-    input = &inputClient;
+    sourceArg.toCharArray(url, 256);
+    guard(http_get(&sourceClient, url), STR_NETWORK_CONNECTION_FAILED);
+    source = &sourceClient;
   } else {
-    String filename = String(CFG_USER_DIRECTORY) + inputArg;
+    String filename = String(CFG_USER_DIRECTORY) + sourceArg;
     guard(SPIFFS.exists(filename), STR_FILES_NOT_FOUND);
-    inputFile = SPIFFS.open(filename, "r");
-    if (inputFile) input = &inputFile;
+    sourceFile = SPIFFS.open(filename, "r");
+    if (sourceFile) source = &sourceFile;
   }
   
-  if (streamArg == STR_COPY_STANDARD_OUTPUT) {
-    stream = &Serial;
+  if (targetArg == STR_COPY_STANDARD_OUTPUT) {
+    target = stream;
   } else {
-    String filename = String(CFG_USER_DIRECTORY) + streamArg;
-    streamFile = SPIFFS.open(filename, "w");   
-    if (streamFile) stream = &streamFile;
+    String filename = String(CFG_USER_DIRECTORY) + targetArg;
+    targetFile = SPIFFS.open(filename, "w");   
+    if (targetFile) target = &targetFile;
   }
   
-  guard(input != NULL, STR_ERROR_INVALID_ARGUMENTS);
-  guard(stream != NULL, STR_ERROR_INVALID_ARGUMENTS);
-  input->setTimeout(config.timeout);
+  guard(source != NULL, STR_ERROR_INVALID_ARGUMENTS);
+  guard(target != NULL, STR_ERROR_INVALID_ARGUMENTS);
+  source->setTimeout(config.timeout);
   size_t count = 1;
   char buffer[CFG_COPY_BUFFER_SIZE];
   digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);
   while (count > 0) {
-    count = input->readBytes(buffer, CFG_COPY_BUFFER_SIZE);
-    stream->write(buffer, count);
+    count = source->readBytes(buffer, CFG_COPY_BUFFER_SIZE);
+    target->write(buffer, count);
   }
   digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
-  input->setTimeout(1000);
-  inputFile.close();
-  streamFile.close();
+  source->setTimeout(1000);
+  sourceFile.close();
+  targetFile.close();
 }
 
 void cmd_xmodem_recv(String args) {
