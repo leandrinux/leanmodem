@@ -307,8 +307,12 @@ void cmd_copy(String args) {
   source->setTimeout(config.timeout);
   size_t count = 1;
   char buffer[CFG_COPY_BUFFER_SIZE];
+  bool usesUserInput = source == stream;
+  bool userUserOutput = target == stream;
+  bool user_stopped = false;
   digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);
-  while (count > 0) {
+  while ((count > 0) && !user_stopped) {
+    user_stopped = !usesUserInput && stream->available() && (stream->read() == CFG_STOP_KEY);
     count = source->readBytes(buffer, CFG_COPY_BUFFER_SIZE);
     target->write(buffer, count);
   }
@@ -316,6 +320,7 @@ void cmd_copy(String args) {
   source->setTimeout(1000);
   sourceFile.close();
   targetFile.close();
+  if (user_stopped) stream->println(STR_STOPPED);
 }
 
 void cmd_xmodem_recv(String args) {
