@@ -22,13 +22,11 @@ You need to have the Arduino IDE installed and properly set up for compiling pro
 1. Download the full code, unzip it in a folder inside your `arduino`.
 2. Set up your IDE so that you can install programs in the nodemcu. [Read this guide in case you need help.](https://www.instructables.com/id/Steps-to-Setup-Arduino-IDE-for-NODEMCU-ESP8266-WiF/)
 3. In case you didn't follow the guide, make sure that you have installed the support for your nodemcu. Go to `Tools -> Board ... -> Board Manager` and install esp8266 2.5.2 by ESP8266 Community.
-4. Go to `Tools -> Library Manager` and install the dependencies for leanmodem. They are:
+4. Go to `Tools -> Library Manager` and install the dependencies for leanmodem. Please be aware that using newer versions could cause compatibility issues. They libraries are:
   * `ESP8266-ping` 2.0.1 by Alessio Leoncini
   * `NTPClient` 3.2.0 by Fabrice Weinberg
   * `Crypto` 0.2.0 by Rhys Weatherley
   * `WiFiEsp` 2.2.2 by bportaluri
-
-  Please be aware that using newer versions may cause incompatibility issues. Let me know if you have any problems.
 5. Since this project uses SPIFFS you will need to install the proper tools. [Go to their repository and follow the instructions.](https://github.com/esp8266/arduino-esp8266fs-plugin)
 6. Set up your Arduino IDE with the following settings:
   * Board: `Generic ESP8266 Module`
