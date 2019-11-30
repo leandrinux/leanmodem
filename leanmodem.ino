@@ -220,29 +220,26 @@ void cmd_files(String args) {
     stream->println(STR_FILES_USER_TITLE);
     directory = CFG_USER_DIRECTORY;    
   }
+  stream->println();
   Dir dir = SPIFFS.openDir(directory);
   bool empty = true;
-  String msg, filename;
+  String filename;
+  char msg[51];
   while (dir.next()) {
     empty = false;
-    msg = String(STR_FILES_ENTRY);
     filename = dir.fileName().substring(directory.length());
-    msg.replace("%s", filename);
-    msg.replace("%d", String(dir.fileSize()));
+    sprintf(msg, STR_FILES_ENTRY, dir.fileSize(), filename.c_str());    
     stream->println(msg);
   }
   if (empty) stream->println(STR_FILES_EMPTY);
   stream->println();
   FSInfo fs_info;
   SPIFFS.info(fs_info);
-  msg = String(STR_FILES_TOTAL_BYTES);
-  msg.replace("%d", String(fs_info.totalBytes));
+  sprintf(msg, STR_FILES_USED_BYTES, fs_info.usedBytes);  
   stream->println(msg);
-  msg = String(STR_FILES_USED_BYTES);
-  msg.replace("%d", String(fs_info.usedBytes));
+  sprintf(msg, STR_FILES_TOTAL_BYTES, fs_info.totalBytes);  
   stream->println(msg);
-  msg = String(STR_FILES_FREE_BYTES);
-  msg.replace("%d", String(fs_info.totalBytes - fs_info.usedBytes));
+  sprintf(msg, STR_FILES_FREE_BYTES, fs_info.totalBytes - fs_info.usedBytes);  
   stream->println(msg);    
 }
 
