@@ -206,6 +206,7 @@ void cmd_telnet(String args) {
 
 void cmd_restart(String args) {
   stream->println(STR_SYSTEM_WILL_RESTART);
+  WiFi.disconnect();
   delay(500);
   ESP.restart();
 }
@@ -307,20 +308,24 @@ void cmd_copy(String args) {
   source->setTimeout(config.timeout);
   size_t count = 1;
   char buffer[CFG_COPY_BUFFER_SIZE];
-  bool usesUserInput = source == stream;
-  bool userUserOutput = target == stream;
+  bool usingUserInput = source == stream;
+  bool usingUserOutput = target == stream;
   bool user_stopped = false;
+  long bytes_copied = 0;
   digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);
   while ((count > 0) && !user_stopped) {
-    user_stopped = !usesUserInput && stream->available() && (stream->read() == CFG_STOP_KEY);
+    user_stopped = !usingUserInput && stream->available() && (stream->read() == CFG_STOP_KEY);
+    if (!usingUserOutput) stream->print(String(bytes_copied)+" bytes copied.\r");
     count = source->readBytes(buffer, CFG_COPY_BUFFER_SIZE);
     target->write(buffer, count);
+    bytes_copied += count;
   }
   digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
   source->setTimeout(1000);
   sourceFile.close();
   targetFile.close();
   if (user_stopped) stream->println(STR_STOPPED);
+  if (!usingUserOutput) stream->println();
 }
 
 void cmd_xmodem_recv(String args) {
@@ -495,10 +500,14 @@ void boot() {
   digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
   ansi_set_stream(&Serial);
   sound_setPin(CFG_BUZZER_PIN);
+  stream->println(STR_SYSTEM_INIT_FS);
   SPIFFS.begin();
   SPIFFS.gc();
   cmd_config(STR_CONFIG_ARG_LOAD);
-  if (config.autoconnect && *config.ssid) cmd_connect("");
+  if (config.autoconnect && *config.ssid) {
+    stream->println(STR_SYSTEM_AUTOCONNECT);
+    cmd_connect("");
+  }
   stream->println(STR_SYSTEM_POST);  
 }
 

@@ -17,6 +17,8 @@
 #define STR_SYSTEM_WILL_RESTART "System will restart"
 #define STR_SYSTEM_ABOUT "leanmodem by @leandrinux"
 #define STR_SYSTEM_BUILD "Build date: " __TIMESTAMP__
+#define STR_SYSTEM_INIT_FS "Preparing the file system"
+#define STR_SYSTEM_AUTOCONNECT "Autoconnecting to the network"
 
 #define STR_CONFIG_NOT_SET "[NOT SET]"
 #define STR_CONFIG_ARG_SAVE "save"
