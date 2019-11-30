@@ -14,6 +14,7 @@
 #define CFG_TELNET_BUFFER_SIZE 2048
 #define CFG_NTP_SERVER "pool.ntp.org"
 #define CFG_COPY_BUFFER_SIZE 1024
+#define CFG_STOP_KEY 'q'
 
 typedef struct {
   char ssid[31];

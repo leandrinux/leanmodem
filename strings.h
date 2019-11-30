@@ -8,6 +8,8 @@
 #define STR_WAIT "Wait"
 #define STR_USER_INPUT_YES "yes"
 #define STR_USER_INPUT_NO "no"
+#define STR_STOPPED "Stopped"
+#define STR_NOT_SUPPORTED "Not supported"
 
 #define STR_SYSTEM_PROMPT "> "
 #define STR_SYSTEM_PRE "\r\nleanmodem is starting up"
@@ -15,7 +17,6 @@
 #define STR_SYSTEM_WILL_RESTART "System will restart"
 #define STR_SYSTEM_ABOUT "leanmodem by @leandrinux"
 #define STR_SYSTEM_BUILD "Build date: " __TIMESTAMP__
-#define STR_NOT_SUPPORTED "Not supported"
 
 #define STR_CONFIG_NOT_SET "[NOT SET]"
 #define STR_CONFIG_ARG_SAVE "save"

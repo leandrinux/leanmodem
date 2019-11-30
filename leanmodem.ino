@@ -354,8 +354,9 @@ void cmd_hexdump(String args) {
   int count = file.readBytes(buffer, CFG_HEXDUMP_LENGTH);
   int offset = 0;
   byte val;
+  bool user_stopped = false;
   digitalWrite(CFG_ACTIVITY_LED_PIN, HIGH);  
-  while (count) {
+  while (count && !user_stopped) {
     sprintf(str, "%08X", offset);
     stream->print(String(str) + ": ");  
     offset += count;
@@ -374,11 +375,16 @@ void cmd_hexdump(String args) {
     }
     stream->print("|");
     stream->println();
+    user_stopped = stream->available() && (stream->read() == CFG_STOP_KEY);
     count = file.readBytes(buffer, sizeof(buffer));
   }
-  sprintf(str, "%08X", offset);
+  if (user_stopped) {
+    stream->println(STR_STOPPED); 
+  } else {
+    sprintf(str, "%08X", offset);  
+    stream->println(String(str));  
+  }
   digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
-  stream->println(String(str));  
   file.close();
 }
 
