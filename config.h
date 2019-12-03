@@ -22,11 +22,13 @@ typedef struct {
   char id[11];
   short int timezone;
   short int timeout;
+  short unsigned int port;
   bool unix_eol;
   bool sound;
   bool ansi;
   bool echo;
   bool autoconnect;
+  bool tcpserver;
 } Config;
 
 typedef void DidConfigChangeHandler(const char[12]);

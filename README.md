@@ -42,7 +42,7 @@ Once you see the command prompt you will be able to use the following commands. 
 ### clear
 Clears the screen. Only works if your Terminal supports ANSI codes and your ANSI flag is set to yes.
 
-### config [nothing/load/save/set]
+### config [load|save|set]
 Allows you to see the current settings, change, load and save them.
 
 * `config`: displays the device configuration
@@ -57,6 +57,7 @@ Allows you to see the current settings, change, load and save them.
   * **echo** [Boolean] When set to `yes` this setting returns all user input to your terminal, displaying it on the screen.
   * **autoconnect** [Boolean] when set to `yes` leanmodem will automatically connect to the wireless network during startup.
   * **unix** [Boolean] when set to `yes`, all line-endings will be LF only (Unix compatible). If set to `no` line-endings will be CRLF (Windows compatible).
+  * **server** [Boolean] when set to `yes`, the device will automatically start up the tcp server at startup, only if the wifi connection was established. `autoconnect` should also be set to `yes` for this to work.
   * **timezone** [Number] sets the current timezone. This will affect how time is displayed by your device.
   * **timeout** [Number] number of milliseconds that the device waits before cutting communication with a remote device. A larger number will make it more resistant to errors but it will make it more unresponsive to the user. A smaller number makes it faster and more responsive, but it could result in communications being cut before it's due (this is a risk with older computers or during user interaction).
 
@@ -92,13 +93,20 @@ Pings the remote host using the standard ICMP method.
 ### pong
 It allows you to play pong! Yes, you read that correctly. Try it out! You need an ANSI compatible terminal.
 
+While this may be fun, it does take up some program space in your device. You can remove by commenting out the line that reads `#define PONG_SUPPORT` in the main file under Build Settings.
+
 ### restart
 Restarts the device
 
 ### scan
 Scans for nearby wireless networks
 
-### setpin [pin number] [yes/no]
+### server [on|off]
+Starts a TCP server listening in the port as defined with `config`. This is an EXPERIMENTAL and UNSAFE feature since it doesn't use any encryption at all!
+
+You can remove this feature from the build if you just remove or comment out the line that reads `#define TCP_SERVER_SUPPORT` under Build Configuration in the main file.
+
+### setpin [pin number] [yes|no]
 Sets a GPIO pin to digital output and sets it HIGH or LOW depending on the provided parameter. For the nodemcu the only available pins are 0, 2, 5, 4, 14, 12 and 13. [Check out this website](https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/) for more information about usable digital output pins in the nodemcu.
 
 ### sha256 [filename]

@@ -4,6 +4,10 @@
 //
 //
 
+// BUILD SETTINGS --------------------------------------------------------------
+#define PONG_SUPPORT // comment this out to remove pong from the build
+#define TCP_SERVER_SUPPORT // comment this out to remove support for management terminal over TCP
+
 // DEPENDENCIES ----------------------------------------------------------------
 #include <ESP8266WiFi.h>
 #include <FS.h>
@@ -16,10 +20,13 @@
 #include "other.h"
 #include "sound.h"
 #include "http.h"
-#include "pong.h"
 #include "ansi.h"
 #include "ping.h"
 #include "xmodem.h"
+
+#ifdef PONG_SUPPORT
+#include "pong.h"
+#endif
 
 // TYPE DEFINITIONS ------------------------------------------------------------
 typedef void (*CommandHandler)(String args);
@@ -46,11 +53,18 @@ void cmd_time(String args);
 void cmd_erase(String args);
 void cmd_hexdump(String args);
 void cmd_sha256(String args);
-void cmd_pong(String args);
 void cmd_clear(String args);
 void cmd_ping(String args);
 void cmd_ver(String args);
 void cmd_setpin(String args);
+
+#ifdef PONG_SUPPORT
+void cmd_pong(String args);
+#endif
+
+#ifdef TCP_SERVER_SUPPORT
+void cmd_server(String args);
+#endif
 
 // CONSTANTS -------------------------------------------------------------------
 const CommandEntry CommandEntries[] = {
@@ -64,9 +78,14 @@ const CommandEntry CommandEntries[] = {
   { "help", cmd_help, "the command you just used :)" },
   { "hexdump", cmd_hexdump, "dumps context of file as hexadecimal info" },
   { "ping", cmd_ping, "pings a remote server" },
+#ifdef PONG_SUPPORT
   { "pong", cmd_pong, "plays a game of pong" },
+#endif  
   { "restart", cmd_restart, "restarts the device" },
   { "scan", cmd_scan, "scans for wireless networks" },
+#ifdef TCP_SERVER_SUPPORT
+  { "server", cmd_server, "turns on/off the tcp server" },
+#endif
   { "setpin", cmd_setpin, "turns on/off a digital pin on the device" },
   { "sha256", cmd_sha256, "calculates the sha256 hash of a user file" },
   { "telnet", cmd_telnet, "connects to telnet hosts"},
@@ -79,6 +98,12 @@ const CommandEntry CommandEntries[] = {
 // GLOBAL VARIABLES ------------------------------------------------------------
 bool isConnected = false;
 Stream *stream = &Serial; 
+bool tcp_server_active = false;
+
+#ifdef TCP_SERVER_SUPPORT
+WiFiServer server(0);
+WiFiClient client;
+#endif
 
 // FUNCTION IMPLEMENTATIONS ----------------------------------------------------
 
@@ -99,10 +124,14 @@ String readln() {
       buffer[i] = ch;
       i++;          
     }
-    if (config.echo && (i>0)) Serial.print(ch);
+    if (!tcp_server_active && config.echo && (i>0)) stream->print(ch);
   }
   buffer[i] = '\0';
-  if (config.echo) stream->print(config.unix_eol ? "\n" : "\r\n");
+  if (tcp_server_active) {
+    stream->read(); // this consumes the LF after CR.
+  } else {
+    if (config.echo) stream->print(config.unix_eol ? "\n" : "\r\n");    
+  }
   return String(buffer);
 }
 
@@ -113,7 +142,7 @@ void cmd_help(String args) {
   int count = sizeof(CommandEntries)/sizeof(CommandEntry);
   for (int i=0; i<count; i++) {
     CommandEntry *entry = (CommandEntry *)&CommandEntries[i];
-    Serial.printf("%10s   %s\r\n", entry->command.c_str(), entry->detail);
+    stream->printf("%10s   %s\r\n", entry->command.c_str(), entry->detail);
   }
 }
 
@@ -158,7 +187,7 @@ void cmd_config(String args) {
     return;
   }
   if (args == "") {
-    config_info(&Serial);
+    config_info(stream);
     return;
   }
   if (config_set(args, &didConfigChange)) return;
@@ -420,10 +449,12 @@ void cmd_sha256(String args) {
   file.close();
 }
 
+#ifdef PONG_SUPPORT
 void cmd_pong(String args) {
   guard(config.ansi, STR_NOT_SUPPORTED);
-  pong_start(&Serial);
+  pong_start(stream);
 }
+#endif
 
 void cmd_clear(String args) {
   guard(config.ansi, STR_NOT_SUPPORTED);
@@ -434,7 +465,7 @@ void cmd_clear(String args) {
 void cmd_ping(String args) {
   guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
   guard(isConnected, STR_NETWORK_UNAVAILABLE);
-  ping(&Serial, (char *)args.c_str()); 
+  ping(stream, (char *)args.c_str()); 
 }
 
 void cmd_ver(String args) {
@@ -459,6 +490,38 @@ void cmd_setpin(String args) {
   sprintf(msg, STR_SET_PIN_OK, pin_number, setting.c_str());
   stream->println(msg);
 }
+
+#ifdef TCP_SERVER_SUPPORT
+void cmd_server(String args) {
+  guard(isConnected, STR_NETWORK_UNAVAILABLE);
+  guard(args != "", STR_ERROR_INVALID_ARGUMENTS);
+  if (args == STR_USER_INPUT_ON) {
+    if (tcp_server_active) {
+      stream->println(STR_SERVER_ALREADY_ON);
+    } else {
+      char msg[81];
+      stream->println(STR_SERVER_DISCLAIMER);
+      sprintf(msg, STR_SERVER_STARTING_UP, WiFi.localIP().toString().c_str(), config.port);
+      stream->println(msg);
+      server.begin(config.port);
+      tcp_server_active = true;      
+    }
+    return;
+  }
+  if (args == STR_USER_INPUT_OFF) {
+    if (tcp_server_active) {
+      stream->println(STR_SERVER_GOODBYE);
+      client.stop();
+      server.begin(0);
+      tcp_server_active = false;
+    } else {
+      stream->println(STR_SERVER_ALREADY_OFF);
+    }
+    return;
+  }
+  stream->println(STR_ERROR_INVALID_ARGUMENTS);
+}
+#endif
 
 CommandHandler findCommand(String cmd) {
   int i = 0;
@@ -495,7 +558,7 @@ void boot() {
   stream->println(STR_SYSTEM_PRE);
   pinMode(CFG_ACTIVITY_LED_PIN, OUTPUT);
   digitalWrite(CFG_ACTIVITY_LED_PIN, LOW);
-  ansi_set_stream(&Serial);
+  
   sound_setPin(CFG_BUZZER_PIN);
   stream->println(STR_SYSTEM_INIT_FS);
   SPIFFS.begin();
@@ -504,8 +567,24 @@ void boot() {
   if (config.autoconnect && *config.ssid) {
     stream->println(STR_SYSTEM_AUTOCONNECT);
     cmd_connect("");
+    #ifdef TCP_SERVER_SUPPORT
+    if (config.tcpserver && isConnected) {
+      cmd_server(STR_USER_INPUT_ON);
+    }
+    #endif
   }
   stream->println(STR_SYSTEM_POST);  
+}
+
+void process_command(Stream *s) {
+  stream = s;
+  ansi_set_stream(s);
+  if (config.echo) {
+    stream->print(config.id);
+    stream->print(STR_SYSTEM_PROMPT);
+  }
+  String userInput = readln();
+  if (userInput != "") parseCommand(userInput);  
 }
 
 // INITIALIZATION AND MAIN LOOP ------------------------------------------------
@@ -515,7 +594,20 @@ void setup() {
 }
 
 void loop() {
-  if (config.echo) Serial.print(STR_SYSTEM_PROMPT);
-  String userInput = readln();
-  if (userInput != "") parseCommand(userInput);
+#ifdef TCP_SERVER_SUPPORT
+  if (tcp_server_active) {
+    if (client) {
+      process_command(&client);                 
+    } else {
+      client = server.available();   
+    }
+    if (Serial.available() && (Serial.read() == CFG_STOP_KEY)) {
+      cmd_server(STR_USER_INPUT_OFF);
+    }
+ } else {
+  process_command(&Serial);           
+ }
+#else
+  process_command(&Serial);        
+#endif  
 }

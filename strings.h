@@ -8,6 +8,8 @@
 #define STR_WAIT "Wait"
 #define STR_USER_INPUT_YES "yes"
 #define STR_USER_INPUT_NO "no"
+#define STR_USER_INPUT_ON "on"
+#define STR_USER_INPUT_OFF "off"
 #define STR_STOPPED "Stopped"
 #define STR_NOT_SUPPORTED "Not supported"
 
@@ -92,5 +94,15 @@
 #define STR_CALENDAR_MONTH_OCT "Oct"
 #define STR_CALENDAR_MONTH_NOV "Nov"
 #define STR_CALENDAR_MONTH_DEC "Dec"
+
+#define STR_SERVER_ALREADY_ON "Server is already active - you are connected to it!"
+#define STR_SERVER_ALREADY_OFF "Server is already inactive"
+#define STR_SERVER_GOODBYE "Goodbye!"
+#define STR_SERVER_DISCLAIMER " *** THE TERMINAL-OVER-TCP FEATURE IS EXPERIMENTAL AND UNSAFE *** \r\n" \
+        "NO ENCRYPTION WILL BE USED, EVERYTHING WILL BE SENT IN PLAIN TEXT, \r\n" \
+        "INCLUDING ANYTHING YOU TYPE SUCH AS PASSWORDS AND OTHER INFORMATION.\r\n" \
+        "ONLY USE THIS IN A NON-PUBLIC NETWORK THAT USES ENCRYPTION.\r\n" \
+        "DISABLE IT AS SOON AS YOU DON'T NEED IT ANYMORE.\r\n"
+#define STR_SERVER_STARTING_UP "Starting up TCP server at %s:%d. Press 'q' to stop."
 
 #endif
