@@ -23,6 +23,7 @@
 #include "ansi.h"
 #include "ping.h"
 #include "xmodem.h"
+#include "datetime.h"
 
 #ifdef PONG_SUPPORT
 #include "pong.h"
@@ -368,7 +369,7 @@ void cmd_time(String args) {
   NTPClient timeClient(ntpUDP, CFG_NTP_SERVER, config.timezone * 3600);
   timeClient.begin();
   timeClient.update();
-  stream->println(timeClient.getFullFormattedTime());
+  stream->println(getFullFormattedTime(&timeClient));
   timeClient.end();
 }
 
